@@ -1,0 +1,4305 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="UTF-8" />
+	<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+	<title>AximAlpha</title>
+	<style>
+		:root {
+			color-scheme: dark;
+		}
+		body {
+			margin: 0;
+			background: #0b0d10;
+			color: #d7e0ea;
+			font-family: Consolas, "Cascadia Mono", "Courier New", monospace;
+			min-height: 100vh;
+			padding: 16px;
+			box-sizing: border-box;
+		}
+		.app {
+			width: min(1480px, 100%);
+			height: calc(100vh - 32px);
+			margin: 0 auto;
+			display: grid;
+			grid-template-columns: minmax(0, 1fr);
+			gap: 14px;
+		}
+		.app.graph-visible {
+			grid-template-columns: minmax(0, 1fr) 520px;
+		}
+		.terminal {
+			width: min(960px, 100%);
+			height: min(80vh, 760px);
+			border: 1px solid #2a3542;
+			border-radius: 10px;
+			background: #0f141a;
+			box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
+			display: grid;
+			grid-template-rows: auto 1fr auto;
+			overflow: hidden;
+		}
+		.app.graph-visible .terminal {
+			width: 100%;
+			height: 100%;
+		}
+		.graphPanel {
+			display: none;
+			border: 1px solid #2a3542;
+			border-radius: 10px;
+			background: #0f141a;
+			box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
+			overflow: hidden;
+			grid-template-rows: 1fr auto;
+			position: relative;
+		}
+		.graphPanel.visible {
+			display: grid;
+		}
+		#debugGraphCanvas {
+			width: 100%;
+			height: 100%;
+			display: block;
+			background: #151b22;
+		}
+		.graphFooter {
+			border-top: 1px solid #2a3542;
+			padding: 10px 12px;
+			font-size: 12px;
+			color: #b8d2ff;
+			background: #10171f;
+			word-break: break-word;
+			display: grid;
+			grid-template-columns: 1fr auto;
+			gap: 10px;
+			align-items: center;
+		}
+		#graphSelectedState {
+			color: #e5eef9;
+		}
+		.graphControls {
+			display: flex;
+			align-items: center;
+			gap: 6px;
+			white-space: nowrap;
+			color: #9eb2c7;
+		}
+		#graphTopCount {
+			width: 64px;
+			padding: 4px 6px;
+			border: 1px solid #2a3542;
+			border-radius: 4px;
+			background: #151b22;
+			color: #e5eef9;
+			font: inherit;
+		}
+		.graphSettingsWrap {
+			position: absolute;
+			top: 10px;
+			right: 10px;
+			z-index: 2;
+			display: grid;
+			justify-items: end;
+			gap: 6px;
+		}
+		#graphSettingsBtn {
+			width: auto;
+			padding: 6px 10px;
+			border: 1px solid #2a3542;
+			border-radius: 6px;
+			background: rgba(16, 23, 31, 0.9);
+			color: #b8d2ff;
+			font: inherit;
+			font-size: 12px;
+			cursor: pointer;
+		}
+		#graphSettingsPanel {
+			display: none;
+			width: 240px;
+			max-height: 68vh;
+			overflow-y: auto;
+			border: 1px solid #2a3542;
+			border-radius: 8px;
+			background: rgba(15, 20, 26, 0.98);
+			padding: 10px;
+			box-shadow: 0 10px 24px rgba(0, 0, 0, 0.4);
+		}
+		#graphSettingsPanel.visible {
+			display: block;
+		}
+		.graphSettingRow {
+			display: grid;
+			gap: 4px;
+			margin-bottom: 10px;
+		}
+		.graphSettingLabel {
+			font-size: 11px;
+			color: #9eb2c7;
+			display: flex;
+			justify-content: space-between;
+			gap: 8px;
+		}
+		.graphSettingRow input[type="range"] {
+			width: 100%;
+		}
+		.graphActionBtn {
+			width: 100%;
+			padding: 7px 10px;
+			border: 1px solid #2a3542;
+			border-radius: 6px;
+			background: #18222c;
+			color: #d7e0ea;
+			font: inherit;
+			font-size: 12px;
+			cursor: pointer;
+		}
+		.graphActionBtn:hover {
+			background: #1d2b38;
+		}
+		.bar {
+			background: #18222c;
+			color: #9eb2c7;
+			padding: 10px 14px;
+			font-size: 13px;
+			border-bottom: 1px solid #2a3542;
+			letter-spacing: 0.2px;
+		}
+		.output {
+			padding: 14px;
+			overflow: auto;
+			line-height: 1.5;
+			font-size: 15px;
+			white-space: pre-wrap;
+			word-break: break-word;
+		}
+		.line {
+			margin: 0 0 6px;
+		}
+		.line.cmd {
+			color: #b8d2ff;
+		}
+		.line.err {
+			color: #ff9ea0;
+		}
+		.inputRow {
+			border-top: 1px solid #2a3542;
+			display: grid;
+			grid-template-columns: auto 1fr;
+			align-items: center;
+			padding: 12px 14px;
+			gap: 10px;
+			background: #10171f;
+		}
+		.prompt {
+			color: #9ec3ff;
+			user-select: none;
+		}
+		#commandInput {
+			border: none;
+			outline: none;
+			background: transparent;
+			color: #e5eef9;
+			font: inherit;
+			width: 100%;
+		}
+		#commandInput:disabled {
+			opacity: 0.35;
+			cursor: not-allowed;
+		}
+		.bake-progress {
+			margin: 2px 0 8px;
+			font-size: 13px;
+			color: #7eb8ff;
+		}
+		.bake-head {
+			display: flex;
+			align-items: center;
+			justify-content: space-between;
+			gap: 8px;
+		}
+		.bake-cancel {
+			border: 1px solid #2a3542;
+			border-radius: 4px;
+			background: #152131;
+			color: #b8d2ff;
+			font: inherit;
+			font-size: 12px;
+			line-height: 1;
+			padding: 2px 6px;
+			cursor: pointer;
+		}
+		.bake-cancel:hover {
+			background: #1b2c40;
+		}
+		.bake-bar-track {
+			background: #1c2a38;
+			border-radius: 4px;
+			height: 8px;
+			overflow: hidden;
+			margin-top: 5px;
+		}
+		.bake-bar-fill {
+			height: 100%;
+			background: linear-gradient(90deg, #2a6fff, #5eb8ff);
+			border-radius: 4px;
+			transition: width 0.08s linear;
+		}
+	</style>
+</head>
+<body>
+	<div class="app" id="appRoot">
+		<div class="terminal">
+			<div class="bar">AximAlpha • axiom-rewrite calculator</div>
+			<div class="output" id="output"></div>
+			<div class="inputRow">
+				<span class="prompt">&gt;</span>
+				<input id="commandInput" autocomplete="off" spellcheck="false" autofocus />
+			</div>
+		</div>
+		<div class="graphPanel" id="graphPanel">
+			<div class="graphSettingsWrap">
+				<button id="graphSettingsBtn" type="button">⚙ Settings</button>
+				<div id="graphSettingsPanel">
+					<div class="graphSettingRow">
+						<div class="graphSettingLabel"><span>Repulsion</span><span id="gRepulsionVal">2.5</span></div>
+						<input id="gRepulsion" type="range" min="0.05" max="8" step="0.05" value="2.5" />
+					</div>
+					<div class="graphSettingRow">
+						<div class="graphSettingLabel"><span>Spring</span><span id="gSpringVal">0.09</span></div>
+						<input id="gSpring" type="range" min="0.005" max="0.4" step="0.005" value="0.09" />
+					</div>
+					<div class="graphSettingRow">
+						<div class="graphSettingLabel"><span>Edge Length</span><span id="gEdgeLengthVal">36</span></div>
+						<input id="gEdgeLength" type="range" min="8" max="120" step="1" value="36" />
+					</div>
+					<div class="graphSettingRow">
+						<div class="graphSettingLabel"><span>Min Distance</span><span id="gMinDistanceVal">18</span></div>
+						<input id="gMinDistance" type="range" min="2" max="40" step="1" value="18" />
+					</div>
+					<div class="graphSettingRow">
+						<div class="graphSettingLabel"><span>Damping</span><span id="gDampingVal">0.9</span></div>
+						<input id="gDamping" type="range" min="0.70" max="0.99" step="0.01" value="0.9" />
+					</div>
+					<div class="graphSettingRow" style="margin-bottom:0;">
+						<div class="graphSettingLabel"><span>Node Size</span><span id="gNodeSizeVal">2.2</span></div>
+						<input id="gNodeSize" type="range" min="1.2" max="8" step="0.1" value="2.2" />
+					</div>
+					<div class="graphSettingRow" style="margin-top:12px; margin-bottom:0;">
+						<button id="graphExportBtn" type="button" class="graphActionBtn">Export PNG</button>
+					</div>
+				</div>
+			</div>
+			<canvas id="debugGraphCanvas"></canvas>
+			<div class="graphFooter">
+				<div>Selected state: <span id="graphSelectedState">(none)</span></div>
+				<div class="graphControls">Top highlights <input id="graphTopCount" type="number" min="1" max="50" value="5" /></div>
+			</div>
+		</div>
+	</div>
+
+	<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+	<script>
+		const output = document.getElementById("output");
+		const input = document.getElementById("commandInput");
+		const appRoot = document.getElementById("appRoot");
+		const graphPanel = document.getElementById("graphPanel");
+		const graphCanvas = document.getElementById("debugGraphCanvas");
+		const graphSelectedState = document.getElementById("graphSelectedState");
+		const graphTopCountInput = document.getElementById("graphTopCount");
+		const graphSettingsBtn = document.getElementById("graphSettingsBtn");
+		const graphSettingsPanel = document.getElementById("graphSettingsPanel");
+		const graphExportBtn = document.getElementById("graphExportBtn");
+		const debugGraph = {
+			nodes: [],
+			edges: [],
+			running: false,
+			selectedNodeId: null,
+			highlightedKeys: new Set(),
+			rankableKeys: [],
+			termsByKey: new Map(),
+			nodeIndexByKey: new Map(),
+			edgeKeySet: new Set(),
+			activeCfg: null,
+			// Live-walk growth control. Geometry rebuilds and highlight re-ranking are
+			// O(edges)/O(nodes), so doing them per appended edge is quadratic — instead
+			// mark dirty here and let the animation frame coalesce them. maxLiveNodes
+			// caps the visualization (not the search) so a wide narrowing frontier
+			// can't stall the UI.
+			pendingEdgeRebuild: false,
+			pendingHighlightRefresh: false,
+			maxLiveNodes: 1200,
+			truncated: false
+		};
+		const walkRuntime = {
+			active: false,
+			stopRequested: false,
+			pendingDecisionResolve: null
+		};
+		const debugGraphSettings = {
+			repulsion: 2.5,
+			spring: 0.09,
+			edgeLength: 36,
+			minDistance: 18,
+			damping: 0.9,
+			nodeSize: 2.2
+		};
+		const graphSettingInputs = {
+			repulsion: { input: document.getElementById("gRepulsion"), out: document.getElementById("gRepulsionVal") },
+			spring: { input: document.getElementById("gSpring"), out: document.getElementById("gSpringVal") },
+			edgeLength: { input: document.getElementById("gEdgeLength"), out: document.getElementById("gEdgeLengthVal") },
+			minDistance: { input: document.getElementById("gMinDistance"), out: document.getElementById("gMinDistanceVal") },
+			damping: { input: document.getElementById("gDamping"), out: document.getElementById("gDampingVal") },
+			nodeSize: { input: document.getElementById("gNodeSize"), out: document.getElementById("gNodeSizeVal") }
+		};
+		let debugScene = null;
+		let debugCamera = null;
+		let debugRenderer = null;
+		let debugNodeGroup = null;
+		let debugEdgeGroup = null;
+		let debugEdgeLine = null;
+		let debugEdgePositions = null;
+		let debugNodeMeshes = [];
+		let debugRaycaster = null;
+		let debugPointer = null;
+		let debugMouseDownX = 0;
+		let debugMouseDownY = 0;
+		let debugIsRotating = false;
+		let debugLastMouseX = 0;
+		let debugLastMouseY = 0;
+		const debugCameraControls = { rotX: 0.38, rotY: 0.72, radius: 180 };
+
+		const state = {
+			rules: [],
+			knownFunctions: new Set(["S"]),
+			baked: {},
+			existentials: {}, // name → arity (0 = constant, 1+ = indexed)
+			// name → { assoc, comm }. Declaring these lets the engine store one canonical
+			// representative per equivalence class instead of re-deriving every ordering
+			// and association as a separate state.
+			algebraic: {},
+			// Narrowing: run a rule backwards even when that direction expands, and
+			// when the reversed rule's LHS has variables the match didn't bind, guess
+			// them from a bounded candidate pool instead of emitting a free variable.
+			// This is what lets the search climb, e.g. 0 -> B(n(0)) -> ... so that
+			// B(0) can reach 1 rather than dead-ending with no neighbors at all.
+			narrow: {
+				enabled: true,
+				numeralBound: 0,      // numerals 0..numeralBound join the candidate pool
+				maxInstantiations: 24, // cap on guesses generated per rule per position
+				zigzagRounds: 4,      // simplify / expand / simplify / … alternations
+				// How many stalled states each expansion fans out from. Naturally bounded
+				// by how much the stalled descent actually explored. Measured: 4 is too
+				// narrow and misses the state that needed expanding (B(0) fails); 16+
+				// succeeds, so this is set well clear of the cliff.
+				zagWidth: 64
+			},
+			// When on, any expression that evaluates to a ground answer is remembered as
+			// a baked fact, so later searches get it for free in both directions.
+			autobake: false,
+			ml: {
+				enabled: false,
+				models: {},
+				// Learned edge ranker: scores candidate rewrites so promising ones are
+				// popped first. Trained on the search's own successful derivations —
+				// edges on the winning path are positives, the rest negatives.
+				ranker: {
+					learn: false,   // train on every successful solve
+					rank: false,    // use the learned scores to steer the queue
+					weights: {},
+					examples: 0,
+					solves: 0
+				}
+			}
+		};
+
+		// Neighbor generation is pure given the current rules/baked/existentials plus
+		// whether narrowing is active, and the same subterms recur constantly across a
+		// search (and across commands), so it's memoized here — one cache per narrowing
+		// mode, since the two produce different neighbor sets for the same term.
+		// invalidateRewriteCache() must be called whenever those tables change.
+		const rewriteCaches = { plain: new Map(), narrow: new Map() };
+		let narrowingActive = false;
+		let bakedReverseIndex = null;
+		let tautologicalRules = null;
+		function invalidateRewriteCache() {
+			rewriteCaches.plain.clear();
+			rewriteCaches.narrow.clear();
+			bakedReverseIndex = null;
+			tautologicalRules = null;
+		}
+
+		// Baked facts are normally one-way (B(0) -> 1). Proof-style reasoning needs the
+		// other direction too — recognising that the 1 inside B(L(0,1)) *is* B(0) is the
+		// only way to reach S(B(0)) = 2. Indexed by result string so the lookup stays
+		// O(1) per node no matter how much has been baked.
+		// Baked entries are keyed by their argument list exactly as it prints inside the
+		// parentheses — "0,1" for F(0,1), "L(0,1)" for F(L(0,1)). That is unambiguous
+		// (argument lists are balanced) and identical to the old numerals-only keys, so
+		// previously exported states still load. Keying by numerals alone made facts
+		// like B(L(0,1))=2 impossible to store or look up.
+		function bakedKeyForArgs(args) {
+			return args.map(termToString).join(",");
+		}
+
+		function getBakedReverseIndex() {
+			if (bakedReverseIndex) return bakedReverseIndex;
+			const index = new Map();
+			for (const [name, table] of Object.entries(state.baked)) {
+				for (const [argKey, valueText] of Object.entries(table)) {
+					let call;
+					try {
+						call = parseExpression(`${name}(${argKey})`);
+					} catch {
+						continue;
+					}
+					if (!index.has(valueText)) index.set(valueText, []);
+					index.get(valueText).push(call);
+				}
+			}
+			bakedReverseIndex = index;
+			return index;
+		}
+
+		function print(text, kind = "") {
+			const line = document.createElement("div");
+			line.className = `line ${kind}`.trim();
+			line.textContent = text;
+			output.appendChild(line);
+			output.scrollTop = output.scrollHeight;
+		}
+
+		function promptWalkDecision(bestKey, round, h) {
+			return new Promise((resolve) => {
+				const row = document.createElement("div");
+				row.className = "line";
+				const text = document.createElement("span");
+				text.textContent = `New simplest state (round ${round}, h=${h}): ${bestKey} `;
+				const haltBtn = document.createElement("button");
+				haltBtn.type = "button";
+				haltBtn.className = "graphActionBtn";
+				haltBtn.style.width = "auto";
+				haltBtn.style.padding = "4px 10px";
+				haltBtn.style.marginLeft = "8px";
+				haltBtn.textContent = "Halt";
+				const continueBtn = document.createElement("button");
+				continueBtn.type = "button";
+				continueBtn.className = "graphActionBtn";
+				continueBtn.style.width = "auto";
+				continueBtn.style.padding = "4px 10px";
+				continueBtn.style.marginLeft = "6px";
+				continueBtn.textContent = "Continue";
+
+				const finish = (action) => {
+					haltBtn.disabled = true;
+					continueBtn.disabled = true;
+					if (walkRuntime.pendingDecisionResolve === finish) {
+						walkRuntime.pendingDecisionResolve = null;
+					}
+					resolve(action);
+				};
+
+				walkRuntime.pendingDecisionResolve = finish;
+
+				haltBtn.addEventListener("click", () => finish("halt"));
+				continueBtn.addEventListener("click", () => finish("continue"));
+
+				row.appendChild(text);
+				row.appendChild(haltBtn);
+				row.appendChild(continueBtn);
+				output.appendChild(row);
+				output.scrollTop = output.scrollHeight;
+			});
+		}
+
+		function sleepFrame() {
+			return new Promise((resolve) => setTimeout(resolve, 0));
+		}
+
+		function sleepMs(ms) {
+			const delay = Math.max(0, Math.floor(ms || 0));
+			return new Promise((resolve) => setTimeout(resolve, delay));
+		}
+
+		async function sleepWalkDelay(ms, isCanceled = null) {
+			const total = Math.max(0, Math.floor(ms || 0));
+			if (total <= 0) return;
+			let remaining = total;
+			while (remaining > 0) {
+				if (isCanceled ? isCanceled() : walkRuntime.stopRequested) return;
+				const chunk = Math.min(30, remaining);
+				await sleepMs(chunk);
+				remaining -= chunk;
+			}
+		}
+
+		function createAsyncProgressBar(label, total = 100, cancellable = false) {
+			const progressEl = document.createElement("div");
+			progressEl.className = "bake-progress";
+			progressEl.innerHTML =
+				`<div class="bake-head"><span class="bake-label">${label}: <span class="bake-count">0</span>/${total}</span>${cancellable ? '<button class="bake-cancel" type="button" title="Cancel">×</button>' : ""}</div>` +
+				`<div class="bake-bar-track"><div class="bake-bar-fill" style="width:0%"></div></div>`;
+			output.appendChild(progressEl);
+			output.scrollTop = output.scrollHeight;
+
+			const labelNode = progressEl.querySelector(".bake-label");
+			const countNode = progressEl.querySelector(".bake-count");
+			const fillNode = progressEl.querySelector(".bake-bar-fill");
+			const cancelNode = progressEl.querySelector(".bake-cancel");
+			let canceled = false;
+
+			if (cancelNode) {
+				cancelNode.addEventListener("click", () => {
+					canceled = true;
+					cancelNode.disabled = true;
+					cancelNode.textContent = "…";
+				});
+			}
+
+			return {
+				isCanceled: () => canceled,
+				update(done, totalValue = total, labelOverride = null) {
+					const safeTotal = Math.max(1, totalValue || 1);
+					countNode.textContent = String(Math.min(done, safeTotal));
+					if (labelOverride) labelNode.textContent = labelOverride;
+					fillNode.style.width = `${Math.max(0, Math.min(100, (done / safeTotal) * 100))}%`;
+					output.scrollTop = output.scrollHeight;
+				},
+				finish(text, color = "#7eb8ff") {
+					progressEl.innerHTML = `<span style="color:${color}">${text}</span>`;
+					output.scrollTop = output.scrollHeight;
+				}
+			};
+		}
+
+		function welcome() {
+			print("AximAlpha ready.");
+			print("Built-in knowledge: numbers and S(x) successor.");
+			print("Examples:");
+			print("  S(2)");
+			print("  S(A(x,y))=A(x,S(y))");
+			print("Commands: ls, ls [name], ls bake, rm [name], rm bake [name], bake [fn] [lo hi]..., evaluate [bound] [expr], paths/path [maxVisited] [expr], walk [delayMs] [expr], stop, debug [expr|evaluate ...], debug off, heur ls, heur set [key] [value], assoc/comm/ac [fn], narrow [bound|on|off|max n|rounds n|width n], autobake [on|off], graph cap [n], ml on, ml off, ml train [fn] [lo hi]..., export, import, clear");
+			print("  Add 'as name[,name...]' to an expression (evaluate/walk/debug/paths) to land on a");
+			print("  form headed by that function instead of the cheapest reachable numeral, e.g. C(2) as L.");
+			print("  exists [name] or exists [name](x,y,...) declares a terminal existential form.");
+			print("  assoc [fn] / comm [fn] / ac [fn] declare algebraic laws so equivalent");
+			print("  rearrangements collapse to one state (assoc also makes the function n-ary).");
+			print("  narrow [bound] widens the pool the search may guess when running a rule backwards");
+			print("  (default: subterms + 0). narrow off disables it; narrow max [n] caps guesses.");
+			print("  Search zig-zags: simplify, and if that stalls, expand outward from the stuck");
+			print("  states and simplify again (narrow rounds/width tune it).");
+			print("  autobake on remembers every solved ground expression as a baked fact.");
+			print("  walk maps the whole reachable space breadth-first (use stop); graph cap [n] sets");
+			print("  how much of it the 3D view will draw.");
+			print("");
+		}
+
+		function tokenize(src) {
+			const tokens = [];
+			let i = 0;
+			while (i < src.length) {
+				const ch = src[i];
+				if (/\s/.test(ch)) {
+					i += 1;
+					continue;
+				}
+				if (/[(),=]/.test(ch)) {
+					tokens.push({ type: ch, value: ch });
+					i += 1;
+					continue;
+				}
+				if (/\d/.test(ch)) {
+					let j = i;
+					while (j < src.length && /\d/.test(src[j])) j += 1;
+					tokens.push({ type: "num", value: src.slice(i, j) });
+					i = j;
+					continue;
+				}
+				if (/[A-Za-z_]/.test(ch)) {
+					let j = i;
+					while (j < src.length && /[A-Za-z0-9_]/.test(src[j])) j += 1;
+					tokens.push({ type: "id", value: src.slice(i, j) });
+					i = j;
+					continue;
+				}
+				throw new Error(`Unexpected character: ${ch}`);
+			}
+			return tokens;
+		}
+
+		function parseExpression(src) {
+			const tokens = tokenize(src);
+			let pos = 0;
+
+			function peek(type) {
+				return tokens[pos] && tokens[pos].type === type;
+			}
+			function consume(type) {
+				if (!peek(type)) {
+					throw new Error(`Expected '${type}'`);
+				}
+				return tokens[pos++];
+			}
+
+			function parseTerm() {
+				if (peek("num")) {
+					return { kind: "num", value: Number(consume("num").value) };
+				}
+				if (!peek("id")) {
+					throw new Error("Expected identifier or number");
+				}
+				const name = consume("id").value;
+				if (peek("(")) {
+					consume("(");
+					const args = [];
+					if (!peek(")")) {
+						args.push(parseTerm());
+						while (peek(",")) {
+							consume(",");
+							args.push(parseTerm());
+						}
+					}
+					consume(")");
+					return { kind: "func", name, args };
+				}
+				// A bare identifier is a variable UNLESS it has been declared as a
+				// zero-arity existential. Without this, `exists e` then using `e` produced
+				// a plain variable, which match() happily binds to anything — the constant
+				// silently behaved as a wildcard.
+				if (state.existentials[name] === 0) {
+					return { kind: "func", name, args: [] };
+				}
+				return { kind: "var", name };
+			}
+
+			const term = parseTerm();
+			if (pos !== tokens.length) {
+				throw new Error("Unexpected trailing tokens");
+			}
+			return term;
+		}
+
+		function parseEquation(src) {
+			const idx = src.indexOf("=");
+			if (idx === -1) throw new Error("Equation must contain '='");
+			const left = src.slice(0, idx).trim();
+			const right = src.slice(idx + 1).trim();
+			if (!left || !right) throw new Error("Invalid equation");
+			return { lhs: parseExpression(left), rhs: parseExpression(right) };
+		}
+
+		// Strips a trailing "as name[,name...]" clause (e.g. "C(2) as L") off an
+		// expression, so callers can ask the solver to land on — and stop at — a
+		// state headed by one of those functions instead of the cheapest reachable
+		// form. No clause means "as" is left to parseExpression like any other token.
+		function parseExpressionWithTarget(text) {
+			const match = text.match(/^(.*?)\s+as\s+([A-Za-z_][A-Za-z0-9_]*(?:\s*,\s*[A-Za-z_][A-Za-z0-9_]*)*)\s*$/i);
+			if (!match) {
+				return { expressionText: text.trim(), targetFunctions: null };
+			}
+			const names = match[2].split(",").map((s) => s.trim()).filter(Boolean);
+			return { expressionText: match[1].trim(), targetFunctions: new Set(names) };
+		}
+
+		function cloneTerm(term) {
+			if (term.kind === "num") return { kind: "num", value: term.value };
+			if (term.kind === "var") return { kind: "var", name: term.name };
+			return { kind: "func", name: term.name, args: term.args.map(cloneTerm) };
+		}
+
+		function termToString(term) {
+			if (term.kind === "num") return String(term.value);
+			if (term.kind === "var") return term.name;
+			// Zero-arity existentials print bare so they round-trip through the parser.
+			if (term.args.length === 0) return term.name;
+			return `${term.name}(${term.args.map(termToString).join(",")})`;
+		}
+
+		function collectFunctionNames(term, set = new Set()) {
+			if (term.kind === "func") {
+				set.add(term.name);
+				for (const arg of term.args) collectFunctionNames(arg, set);
+			}
+			return set;
+		}
+
+		// Canonical form for declared algebraic operators:
+		//   associative        → flatten nested applications into one n-ary node, order kept
+		//   commutative        → sort the arguments, arity unchanged
+		//   associative+comm   → flatten and sort
+		// Two terms that differ only by these laws then have identical strings, so the
+		// search stores them once instead of exploring each rearrangement separately.
+		function canonicalizeTerm(term) {
+			if (term.kind !== "func") return cloneTerm(term);
+			const props = state.algebraic[term.name];
+			let args = term.args.map(canonicalizeTerm);
+
+			if (props && props.assoc) {
+				const flattened = [];
+				for (const arg of args) {
+					if (arg.kind === "func" && arg.name === term.name) flattened.push(...arg.args);
+					else flattened.push(arg);
+				}
+				args = flattened;
+				// A flattened associative operator applied to one thing is that thing.
+				if (args.length === 1) return args[0];
+			}
+
+			if (props && props.comm) {
+				args = args.slice().sort((a, b) => {
+					const sa = termToString(a);
+					const sb = termToString(b);
+					return sa < sb ? -1 : sa > sb ? 1 : 0;
+				});
+			}
+
+			return { kind: "func", name: term.name, args };
+		}
+
+		function isAlgebraic(name) {
+			const props = state.algebraic[name];
+			return Boolean(props && (props.assoc || props.comm));
+		}
+
+		function isEqual(a, b) {
+			if (a.kind !== b.kind) return false;
+			if (a.kind === "num") return a.value === b.value;
+			if (a.kind === "var") return a.name === b.name;
+			if (a.name !== b.name || a.args.length !== b.args.length) return false;
+			for (let i = 0; i < a.args.length; i += 1) {
+				if (!isEqual(a.args[i], b.args[i])) return false;
+			}
+			return true;
+		}
+
+		// ── Heuristic configuration ────────────────────────────────────────
+		const heuristicConfig = {
+			functionWeight:     10,
+			depthWeight:         2,
+			symbolWeight:        1,
+			offTargetPenalty:  500,
+			tolerance:           5,
+			explorationInterval: 20,
+			explorationChance:   0.15,
+			alternatePathChance: 0.00,
+			alternatePathToleranceMultiplier: 2,
+			successorDetourMultiplier: 8,
+			narrowDetourMultiplier: 8,
+			rankerWeight: 12,
+			explorationPoolSample: 8,
+			explorationPoolLimit: 200,
+			explorationPoolTrimTo: 100
+		};
+
+		// Minimal binary min-heap used by the solver priority queue
+		class MinHeap {
+			constructor() { this.data = []; }
+			get size() { return this.data.length; }
+			push(item) {
+				this.data.push(item);
+				let i = this.data.length - 1;
+				while (i > 0) {
+					const p = (i - 1) >> 1;
+					if (this.data[p].f <= this.data[i].f) break;
+					[this.data[p], this.data[i]] = [this.data[i], this.data[p]];
+					i = p;
+				}
+			}
+			pop() {
+				const top = this.data[0];
+				const last = this.data.pop();
+				if (this.data.length > 0) {
+					this.data[0] = last;
+					let i = 0;
+					while (true) {
+						let s = i, l = 2*i+1, r = 2*i+2;
+						if (l < this.data.length && this.data[l].f < this.data[s].f) s = l;
+						if (r < this.data.length && this.data[r].f < this.data[s].f) s = r;
+						if (s === i) break;
+						[this.data[s], this.data[i]] = [this.data[i], this.data[s]];
+						i = s;
+					}
+				}
+				return top;
+			}
+		}
+
+		function termDepth(term) {
+			if (term.kind !== "func") return 0;
+			let max = 0;
+			for (const a of term.args) { const d = termDepth(a); if (d > max) max = d; }
+			return 1 + max;
+		}
+
+		function termSymbolCount(term) {
+			if (term.kind !== "func") return 1;
+			return 1 + term.args.reduce((s, a) => s + termSymbolCount(a), 0);
+		}
+
+		// Is this term composed entirely of numbers and correctly-applied existential forms?
+		function isExistentiallySimplified(term) {
+			if (term.kind === "num") return true;
+			if (term.kind === "var") return false;
+			const arity = state.existentials[term.name];
+			if (arity === undefined) return false;
+			if (term.args.length !== arity) return false;
+			return term.args.every(isExistentiallySimplified);
+		}
+
+		// Structural cost of a term ignoring target vocabulary: every non-existential
+		// function application costs a flat functionWeight (no per-function dependency
+		// hierarchy — there's no single "true" cost when the same value can legitimately
+		// be expressed several ways, e.g. C(2) vs L(1,0)), plus depth/symbol-count terms.
+		function structuralCost(term, cfg, target) {
+			if (term.kind !== "func") return term.kind === "num" ? 0 : cfg.symbolWeight;
+			let funcCost = 0;
+			function walk(node) {
+				if (node.kind === "func") {
+					const isTarget = target && target.has(node.name);
+					const isExistentialNode = state.existentials[node.name] !== undefined;
+					if (!isTarget && !isExistentialNode) funcCost += cfg.functionWeight;
+					for (const a of node.args) walk(a);
+				}
+			}
+			walk(term);
+			return funcCost
+				+ termDepth(term) * cfg.depthWeight
+				+ termSymbolCount(term) * cfg.symbolWeight;
+		}
+
+		// h(n): structural complexity estimate, optionally biased toward a target
+		// vocabulary (cfg.targetFunctions). With no target, this just drives toward
+		// the cheapest reachable form (usually a plain numeral) as before. With a
+		// target, a bare numeral or a non-target wrapper is no longer free — only a
+		// term actually headed by one of the target functions counts as "reached" —
+		// otherwise the search always blows straight through an intermediate form
+		// like L(1,0) on its way to the fully-collapsed numeral.
+		function termHeuristic(term, cfg = heuristicConfig) {
+			if (term.kind === "var") return cfg.symbolWeight;
+			const target = cfg.targetFunctions;
+			const hasTarget = Boolean(target && target.size > 0);
+
+			if (!hasTarget) {
+				if (term.kind === "num") return 0;
+				if (isExistentiallySimplified(term)) return 0;
+				return structuralCost(term, cfg, null);
+			}
+
+			// An existential is a terminal, but that does not make it an answer to the
+			// question that was asked: "3 as B" wants a B-headed form, so e(0) scoring 0
+			// would end the search holding something that isn't in the requested
+			// vocabulary at all. Only a targeted existential is free.
+			if (term.kind === "func" && target.has(term.name) && state.existentials[term.name] !== undefined && isExistentiallySimplified(term)) {
+				return 0;
+			}
+
+			let h = structuralCost(term, cfg, target);
+			const matchesTarget = term.kind === "func" && target.has(term.name);
+			if (!matchesTarget) h += cfg.offTargetPenalty;
+			return h;
+		}
+
+		// Only use a rule in reverse when the LHS is structurally simpler than the RHS
+		// (i.e. the forward direction expands, not reduces). Always judged against the
+		// base (untargeted) cost so that neighbor generation — and its cache — stays
+		// independent of whatever target a given search happens to be using.
+		function canUseReverseRule(rule) {
+			if (rule.rhs.kind === "var") return false;
+			return termHeuristic(rule.lhs, heuristicConfig) <= termHeuristic(rule.rhs, heuristicConfig);
+		}
+
+		function getFunctionDefiningRules(functionName) {
+			const defining = [];
+			for (const rule of state.rules) {
+				const lhs = rule.lhs;
+				const rhs = rule.rhs;
+				const lhsRoot = lhs.kind === "func" && lhs.name === functionName;
+				const rhsRoot = rhs.kind === "func" && rhs.name === functionName;
+				if (lhsRoot) {
+					defining.push(rule);
+					continue;
+				}
+				if (rhsRoot) {
+					const lhsFns = collectFunctionNames(lhs, new Set());
+					if (lhsFns.has(functionName)) {
+						defining.push(rule);
+					}
+				}
+			}
+			return defining;
+		}
+
+		function computeSuccessorDependentFunctions() {
+			const dependencyGraph = new Map();
+
+			for (const name of state.knownFunctions) {
+				if (name !== "S") dependencyGraph.set(name, new Set());
+			}
+
+			for (const rule of state.rules) {
+				const involved = new Set();
+				collectFunctionNames(rule.lhs, involved);
+				collectFunctionNames(rule.rhs, involved);
+
+				for (const fn of involved) {
+					if (fn === "S") continue;
+					if (!dependencyGraph.has(fn)) dependencyGraph.set(fn, new Set());
+					for (const dep of involved) {
+						if (dep === fn) continue;
+						dependencyGraph.get(fn).add(dep);
+					}
+				}
+			}
+
+			const memo = new Map();
+			function dependsOnS(fn, stack = new Set()) {
+				if (memo.has(fn)) return memo.get(fn);
+				if (stack.has(fn)) return false;
+				stack.add(fn);
+
+				const deps = dependencyGraph.get(fn) || new Set();
+				if (deps.has("S")) {
+					memo.set(fn, true);
+					stack.delete(fn);
+					return true;
+				}
+
+				for (const dep of deps) {
+					if (dep === "S") {
+						memo.set(fn, true);
+						stack.delete(fn);
+						return true;
+					}
+					if (dependencyGraph.has(dep) && dependsOnS(dep, stack)) {
+						memo.set(fn, true);
+						stack.delete(fn);
+						return true;
+					}
+				}
+
+				memo.set(fn, false);
+				stack.delete(fn);
+				return false;
+			}
+
+			const needsS = new Set();
+			for (const fn of dependencyGraph.keys()) {
+				if (dependsOnS(fn)) needsS.add(fn);
+			}
+			return needsS;
+		}
+
+		function termHasAnyFunction(term, namesSet) {
+			if (!namesSet || namesSet.size === 0) return false;
+			const involved = new Set();
+			collectFunctionNames(term, involved);
+			for (const name of involved) {
+				if (namesSet.has(name)) return true;
+			}
+			return false;
+		}
+
+		function match(pattern, term, env = {}) {
+			if (pattern.kind === "var") {
+				const current = env[pattern.name];
+				if (!current) {
+					env[pattern.name] = term;
+					return env;
+				}
+				return isEqual(current, term) ? env : null;
+			}
+			if (pattern.kind !== term.kind) return null;
+			if (pattern.kind === "num") {
+				return pattern.value === term.value ? env : null;
+			}
+			if (pattern.name !== term.name) return null;
+			if (isAlgebraic(pattern.name)) {
+				return matchAlgebraicArgs(pattern.name, state.algebraic[pattern.name], pattern.args, term.args, env);
+			}
+			if (pattern.args.length !== term.args.length) return null;
+			let work = env;
+			for (let i = 0; i < pattern.args.length; i += 1) {
+				work = match(pattern.args[i], term.args[i], work);
+				if (!work) return null;
+			}
+			return work;
+		}
+
+		// AC extension. An equation between terms headed by an associative operator also
+		// applies to a *sub-multiset* of a wider term, with the untouched arguments
+		// carried along: L(a,b)=L(c,d) rewrites L(a,b,e) to L(c,d,e). Without this, a
+		// two-argument rule can never fire on a three-argument term, because the pattern
+		// would have to absorb the extra argument into a group and change its shape.
+		// Returns { env, prefix, suffix } — for commutative operators order is irrelevant
+		// so the remainder all lands in suffix.
+		function matchAlgebraicSubsets(name, props, patternArgs, termArgs, limit = 12) {
+			const found = [];
+			if (termArgs.length > 8 || patternArgs.length >= termArgs.length) return found;
+
+			const groupAsTerm = (items) => items.length === 1
+				? items[0]
+				: canonicalizeTerm({ kind: "func", name, args: items.map(cloneTerm) });
+
+			if (props.comm) {
+				const used = new Array(termArgs.length).fill(false);
+				const step = (patternIndex, env) => {
+					if (found.length >= limit) return;
+					if (patternIndex === patternArgs.length) {
+						const rest = [];
+						for (let i = 0; i < termArgs.length; i += 1) if (!used[i]) rest.push(termArgs[i]);
+						if (rest.length > 0) found.push({ env: { ...env }, prefix: [], suffix: rest });
+						return;
+					}
+					const available = [];
+					for (let i = 0; i < termArgs.length; i += 1) if (!used[i]) available.push(i);
+					const groupLimit = props.assoc ? available.length : 1;
+					const total = 1 << available.length;
+					for (let mask = 1; mask < total && found.length < limit; mask += 1) {
+						const picked = [];
+						for (let bit = 0; bit < available.length; bit += 1) {
+							if (mask & (1 << bit)) picked.push(available[bit]);
+						}
+						if (picked.length > groupLimit) continue;
+						const bound = match(patternArgs[patternIndex], groupAsTerm(picked.map((i) => termArgs[i])), { ...env });
+						if (!bound) continue;
+						for (const i of picked) used[i] = true;
+						step(patternIndex + 1, bound);
+						for (const i of picked) used[i] = false;
+					}
+				};
+				step(0, {});
+				return found;
+			}
+
+			// Associative only: the matched arguments must be a contiguous run, and the
+			// remainder keeps its position on either side.
+			for (let start = 0; start + patternArgs.length <= termArgs.length && found.length < limit; start += 1) {
+				let env = {};
+				let ok = true;
+				for (let i = 0; i < patternArgs.length; i += 1) {
+					const bound = match(patternArgs[i], termArgs[start + i], { ...env });
+					if (!bound) { ok = false; break; }
+					env = bound;
+				}
+				if (!ok) continue;
+				found.push({
+					env,
+					prefix: termArgs.slice(0, start),
+					suffix: termArgs.slice(start + patternArgs.length)
+				});
+			}
+			return found;
+		}
+
+		// Rules are written in binary form (L(x,B(x))) but canonical terms are n-ary
+		// (L(0,1,B(L(0,1)))), so a pattern argument may have to absorb a *group* of term
+		// arguments — here x binds to L(0,1). Associative-only groups must stay
+		// contiguous and in order; commutative ones may be any subset. Without grouping,
+		// declaring a function associative would silently stop its rules from matching.
+		function matchAlgebraicArgs(name, props, patternArgs, termArgs, env) {
+			if (patternArgs.length > termArgs.length) return null;
+
+			// Grouping only makes sense for an associative operator: a commutative-only
+			// operator has fixed arity, so arguments permute but never merge.
+			if (!props.assoc) {
+				if (patternArgs.length !== termArgs.length) return null;
+				if (!props.comm) {
+					let work = env;
+					for (let i = 0; i < patternArgs.length; i += 1) {
+						work = match(patternArgs[i], termArgs[i], work);
+						if (!work) return null;
+					}
+					return work;
+				}
+			}
+
+			// Searching assignments is exponential in the argument count, so above this
+			// width fall back to plain positional matching rather than stalling.
+			const WIDTH_LIMIT = 8;
+			if (termArgs.length > WIDTH_LIMIT) {
+				if (patternArgs.length !== termArgs.length) return null;
+				let work = env;
+				for (let i = 0; i < patternArgs.length; i += 1) {
+					work = match(patternArgs[i], termArgs[i], work);
+					if (!work) return null;
+				}
+				return work;
+			}
+
+			const groupAsTerm = (items) => items.length === 1
+				? items[0]
+				: canonicalizeTerm({ kind: "func", name, args: items.map(cloneTerm) });
+
+			if (!props.comm) {
+				// Associative, not commutative: contiguous groups, order preserved.
+				const step = (patternIndex, termIndex, current) => {
+					if (patternIndex === patternArgs.length) {
+						return termIndex === termArgs.length ? current : null;
+					}
+					const patternsLeft = patternArgs.length - patternIndex - 1;
+					const maxTake = termArgs.length - termIndex - patternsLeft;
+					for (let take = 1; take <= maxTake; take += 1) {
+						const group = termArgs.slice(termIndex, termIndex + take);
+						const bound = match(patternArgs[patternIndex], groupAsTerm(group), { ...current });
+						if (!bound) continue;
+						const rest = step(patternIndex + 1, termIndex + take, bound);
+						if (rest) return rest;
+					}
+					return null;
+				};
+				return step(0, 0, env);
+			}
+
+			// Commutative (with or without associativity): assign subsets of arguments.
+			const used = new Array(termArgs.length).fill(false);
+			const groupSizeLimit = props.assoc ? termArgs.length : 1;
+			const step = (patternIndex, current) => {
+				if (patternIndex === patternArgs.length) {
+					return used.every(Boolean) ? current : null;
+				}
+				const available = [];
+				for (let i = 0; i < termArgs.length; i += 1) if (!used[i]) available.push(i);
+				if (available.length === 0) return null;
+
+				const isLast = patternIndex === patternArgs.length - 1;
+				const total = 1 << available.length;
+				for (let mask = 1; mask < total; mask += 1) {
+					// The final pattern argument must account for everything left over.
+					if (isLast && mask !== total - 1) continue;
+					const picked = [];
+					for (let bit = 0; bit < available.length; bit += 1) {
+						if (mask & (1 << bit)) picked.push(available[bit]);
+					}
+					if (picked.length > groupSizeLimit) continue;
+					const group = picked.map((i) => termArgs[i]);
+					const bound = match(patternArgs[patternIndex], groupAsTerm(group), { ...current });
+					if (!bound) continue;
+					for (const i of picked) used[i] = true;
+					const rest = step(patternIndex + 1, bound);
+					if (rest) return rest;
+					for (const i of picked) used[i] = false;
+				}
+				return null;
+			};
+			return step(0, env);
+		}
+
+		function matchWithRigidVars(pattern, term, rigidVars = new Set(), env = {}) {
+			if (pattern.kind === "var") {
+				if (rigidVars.has(pattern.name)) {
+					return term.kind === "var" && term.name === pattern.name ? env : null;
+				}
+				const current = env[pattern.name];
+				if (!current) {
+					env[pattern.name] = term;
+					return env;
+				}
+				return isEqual(current, term) ? env : null;
+			}
+			if (pattern.kind !== term.kind) return null;
+			if (pattern.kind === "num") {
+				return pattern.value === term.value ? env : null;
+			}
+			if (pattern.name !== term.name || pattern.args.length !== term.args.length) {
+				return null;
+			}
+			let work = env;
+			for (let i = 0; i < pattern.args.length; i += 1) {
+				work = matchWithRigidVars(pattern.args[i], term.args[i], rigidVars, work);
+				if (!work) return null;
+			}
+			return work;
+		}
+
+		function substitute(term, env) {
+			if (term.kind === "var") {
+				return env[term.name] ? cloneTerm(env[term.name]) : cloneTerm(term);
+			}
+			if (term.kind === "num") return cloneTerm(term);
+			return {
+				kind: "func",
+				name: term.name,
+				args: term.args.map((arg) => substitute(arg, env))
+			};
+		}
+
+		function rewriteAtRoot(term) {
+			const results = [];
+
+			if (term.kind === "func" && state.baked[term.name]) {
+				{
+					const key = bakedKeyForArgs(term.args);
+					if (key in state.baked[term.name]) {
+						results.push({
+							term: parseExpression(state.baked[term.name][key]),
+							reason: "baked"
+						});
+						// A baked answer is authoritative while plainly evaluating, so stop
+						// here. Under narrowing we keep going: the other rewrites are
+						// exactly the uphill moves a proof may need.
+						if (!narrowingActive) return results;
+					}
+				}
+			}
+
+			if (narrowingActive) {
+				const reverseBaked = getBakedReverseIndex().get(termToString(term));
+				if (reverseBaked) {
+					for (const call of reverseBaked) {
+						results.push({
+							term: cloneTerm(call),
+							reason: `baked ${termToString(call)} (reverse, expand)`
+						});
+					}
+				}
+			}
+
+			if (term.kind === "func" && term.name === "S" && term.args.length === 1) {
+				const inner = term.args[0];
+				if (inner.kind === "num") {
+					results.push({
+						term: { kind: "num", value: inner.value + 1 },
+						reason: "successor"
+					});
+				}
+			}
+
+			if (term.kind === "num" && term.value > 0) {
+				results.push({
+					term: {
+						kind: "func",
+						name: "S",
+						args: [{ kind: "num", value: term.value - 1 }]
+					},
+					reason: "expand-number"
+				});
+			}
+
+			for (const rule of state.rules) {
+				if (ruleIsAlgebraicTautology(rule)) continue;
+				const envForward = match(rule.lhs, term, {});
+				if (envForward) {
+					results.push({
+						term: substitute(rule.rhs, envForward),
+						reason: `rule ${rule.source}`
+					});
+				}
+
+				// AC-extended forms: apply the rule to part of a wider associative term.
+				for (const extended of acExtendedRewrites(rule, term)) {
+					results.push(extended);
+				}
+
+				const envReverse = match(rule.rhs, term, {});
+				if (!envReverse) continue;
+
+				// Variables that appear only on the rule's LHS are unbound by a reverse
+				// match — running the rule backwards has to invent them.
+				const freeVars = [...collectVariableNames(rule.lhs)].filter((v) => envReverse[v] === undefined);
+
+				if (freeVars.length === 0) {
+					if (canUseReverseRule(rule)) {
+						// Reverse that doesn't expand: always available, as before.
+						results.push({
+							term: substitute(rule.lhs, envReverse),
+							reason: `rule ${rule.source} (reverse)`
+						});
+					} else if (narrowingActive) {
+						// Reverse that expands: only under narrowing, and tagged so the
+						// search gates it as a detour rather than a free win.
+						results.push({
+							term: substitute(rule.lhs, envReverse),
+							reason: `rule ${rule.source} (reverse, expand)`
+						});
+					}
+					continue;
+				}
+
+				if (!narrowingActive) continue;
+				for (const assignment of buildNarrowAssignments(freeVars, term)) {
+					const env = { ...envReverse, ...assignment };
+					const label = freeVars.map((v) => `${v}:=${termToString(assignment[v])}`).join(",");
+					results.push({
+						term: substitute(rule.lhs, env),
+						reason: `rule ${rule.source} (reverse, narrow ${label})`
+					});
+				}
+			}
+
+			return results;
+		}
+
+		// Both directions of a rule whose sides are headed by the same associative
+		// operator as the term, applied to a sub-multiset with the rest carried along.
+		function acExtendedRewrites(rule, term) {
+			const out = [];
+			if (term.kind !== "func") return out;
+			const props = state.algebraic[term.name];
+			if (!props || !props.assoc) return out;
+
+			const directions = [
+				{ from: rule.lhs, to: rule.rhs, label: "" },
+				{ from: rule.rhs, to: rule.lhs, label: " (reverse)" }
+			];
+
+			for (const dir of directions) {
+				if (dir.from.kind !== "func" || dir.from.name !== term.name) continue;
+				// Reverse needs the same guard as the ordinary reverse path.
+				if (dir.label && !canUseReverseRule(rule)) continue;
+				// Anything unbound on the other side would need narrowing; skip here.
+				const producedVars = [...collectVariableNames(dir.to)];
+				for (const bundle of matchAlgebraicSubsets(term.name, props, dir.from.args, term.args)) {
+					if (producedVars.some((v) => bundle.env[v] === undefined)) continue;
+					const rewritten = substitute(dir.to, bundle.env);
+					const combined = canonicalizeTerm({
+						kind: "func",
+						name: term.name,
+						args: [...bundle.prefix, rewritten, ...bundle.suffix].map(cloneTerm)
+					});
+					if (isEqual(combined, term)) continue;
+					out.push({ term: combined, reason: `rule ${rule.source}${dir.label} (AC)` });
+				}
+			}
+			return out;
+		}
+
+		// Candidate values for narrowing come from the term being rewritten at this
+		// position, plus numerals 0..numeralBound. Deliberately local to the subterm
+		// so neighbor generation stays a pure function of that subterm — which is what
+		// keeps the rewrite cache valid.
+		function collectSubterms(term, out = new Map()) {
+			const key = termToString(term);
+			if (!out.has(key)) out.set(key, cloneTerm(term));
+			if (term.kind === "func") {
+				for (const arg of term.args) collectSubterms(arg, out);
+			}
+			return out;
+		}
+
+		function buildNarrowCandidates(term) {
+			const byKey = collectSubterms(term);
+			const bound = Math.max(0, Math.floor(state.narrow.numeralBound));
+			for (let n = 0; n <= bound; n += 1) {
+				const key = String(n);
+				if (!byKey.has(key)) byKey.set(key, { kind: "num", value: n });
+			}
+			return [...byKey.values()];
+		}
+
+		function buildNarrowAssignments(freeVars, term) {
+			const candidates = buildNarrowCandidates(term);
+			const cap = Math.max(1, Math.floor(state.narrow.maxInstantiations));
+			const assignments = [];
+			function walk(idx, acc) {
+				if (assignments.length >= cap) return;
+				if (idx === freeVars.length) {
+					assignments.push({ ...acc });
+					return;
+				}
+				for (const candidate of candidates) {
+					if (assignments.length >= cap) return;
+					acc[freeVars[idx]] = candidate;
+					walk(idx + 1, acc);
+					delete acc[freeVars[idx]];
+				}
+			}
+			walk(0, {});
+			return assignments;
+		}
+
+		function rewriteAnywhereUncached(term) {
+			const all = [];
+			for (const result of rewriteAtRoot(term)) {
+				all.push({ term: result.term, reason: result.reason });
+			}
+			if (term.kind === "func") {
+				for (let i = 0; i < term.args.length; i += 1) {
+					const child = term.args[i];
+					const childRewrites = getRewriteNeighbors(child);
+					for (const rw of childRewrites) {
+						const copy = cloneTerm(term);
+						copy.args[i] = rw.term;
+						all.push({ term: copy, reason: `${rw.reason} @arg${i + 1}` });
+					}
+				}
+			}
+
+			// NOTE: this used to also emit "speculative wrappers" — replacing a subterm T
+			// with F(T) in the hope it enabled a rule. That is not equality-preserving:
+			// nothing states T = F(T). It let B(1) "reduce" to 2 by swapping n(0) for
+			// B(n(0)) (which equals 0), making the rest of the derivation look valid.
+			// Removing it costs nothing — every sound derivation still succeeds.
+
+			// Canonicalise before dedup so rearrangements of a declared associative or
+			// commutative operator collapse into a single neighbour.
+			for (const entry of all) {
+				entry.term = canonicalizeTerm(entry.term);
+			}
+			return dedupeTerms(all);
+		}
+
+		// Once a function is declared associative/commutative, its own commutativity and
+		// associativity rules rewrite a canonical term to itself. Skipping them avoids
+		// generating a pile of no-op neighbours on every single node.
+		function ruleIsAlgebraicTautology(rule) {
+			if (!tautologicalRules) {
+				tautologicalRules = new Set();
+				for (const candidate of state.rules) {
+					if (isEqual(canonicalizeTerm(candidate.lhs), canonicalizeTerm(candidate.rhs))) {
+						tautologicalRules.add(candidate);
+					}
+				}
+			}
+			return tautologicalRules.has(rule);
+		}
+
+		function getRewriteNeighbors(term) {
+			const cache = narrowingActive ? rewriteCaches.narrow : rewriteCaches.plain;
+			const key = termToString(term);
+			const cached = cache.get(key);
+			if (cached) return cached;
+			const result = rewriteAnywhereUncached(term);
+			cache.set(key, result);
+			return result;
+		}
+
+		function dedupeTerms(terms) {
+			const seen = new Set();
+			const unique = [];
+			for (const t of terms) {
+				const key = termToString(t.term);
+				if (!seen.has(key)) {
+					seen.add(key);
+					unique.push(t);
+				}
+			}
+			return unique;
+		}
+
+		// ── Learned edge ranker ────────────────────────────────────────────
+		// The structural heuristic scores STATES; it cannot say which of the ~40
+		// candidate rewrites at a node is worth trying. That branching factor is the
+		// real cost driver, so this scores EDGES instead, from cheap features that are
+		// already to hand during expansion (no extra term walks).
+		function edgeCategory(reason) {
+			if (reason.startsWith("baked") && reason.includes("(reverse")) return "baked-rev";
+			if (reason.startsWith("baked")) return "baked";
+			if (reason.includes("(reverse, narrow")) return "narrow";
+			if (reason.includes("(reverse, expand")) return "expand";
+			if (reason.includes("(AC)")) return "ac";
+			if (reason.includes("(reverse)")) return "reverse";
+			if (reason.startsWith("rule ")) return "rule";
+			if (reason.includes("expand-number")) return "expand-number";
+			if (reason.includes("successor")) return "successor";
+			return "other";
+		}
+
+		function ruleIdOf(reason) {
+			const m = reason.match(/^rule (.+?)(?: \((?:reverse|AC)[^)]*\))?(?: @arg.*)?$/);
+			return m ? m[1] : null;
+		}
+
+		function clamp01(v, lo, hi) { return Math.max(lo, Math.min(hi, v)); }
+
+		// Features are (key, value) pairs; the model is a sparse linear score.
+		function edgeFeatures(reason, h, nH, positionDepth) {
+			const feats = [
+				["bias", 1],
+				["dh", clamp01((nH - h) / 40, -3, 3)],
+				["h", clamp01(nH / 80, 0, 4)],
+				["depth", clamp01(positionDepth / 4, 0, 3)],
+				[`cat:${edgeCategory(reason)}`, 1]
+			];
+			const rid = ruleIdOf(reason);
+			if (rid) feats.push([`rule:${rid}`, 1]);
+			return feats;
+		}
+
+		function scoreEdgeFeatures(feats) {
+			const w = state.ml.ranker.weights;
+			let sum = 0;
+			for (const [key, value] of feats) {
+				const weight = w[key];
+				if (weight) sum += weight * value;
+			}
+			return sum;
+		}
+
+		// Logistic SGD: push weights up for edges that ended up on the derivation and
+		// down for the ones that were generated but never used.
+		function trainRankerFromSolve(solved) {
+			const ranker = state.ml.ranker;
+			if (!solved || !solved.path || solved.path.length === 0) return 0;
+
+			const onPath = new Set(solved.path.map((s) => `${s.from}=>${s.to}`));
+			const samples = [];
+			for (const edge of solved.edges || []) {
+				const key = `${edge.from}=>${edge.to}`;
+				samples.push({ edge, label: onPath.has(key) ? 1 : 0 });
+			}
+			if (samples.length === 0) return 0;
+
+			// Keep every positive; subsample negatives so the update isn't swamped.
+			const positives = samples.filter((s) => s.label === 1);
+			const negatives = samples.filter((s) => s.label === 0);
+			const wanted = Math.min(negatives.length, positives.length * 12);
+			const chosen = positives.concat(
+				negatives.sort(() => Math.random() - 0.5).slice(0, wanted)
+			);
+
+			const cfg = heuristicConfig;
+			const rate = 0.08;
+			let trained = 0;
+			for (const sample of chosen) {
+				let fromTerm, toTerm;
+				try {
+					fromTerm = parseExpression(sample.edge.from);
+					toTerm = parseExpression(sample.edge.to);
+				} catch { continue; }
+				const reason = sample.edge.reason || "";
+				const h = termHeuristic(fromTerm, cfg);
+				const nH = termHeuristic(toTerm, cfg);
+				const positionDepth = (reason.match(/@arg/g) || []).length;
+				const feats = edgeFeatures(reason, h, nH, positionDepth);
+				const z = scoreEdgeFeatures(feats);
+				const p = 1 / (1 + Math.exp(-z));
+				const err = sample.label - p;
+				for (const [key, value] of feats) {
+					ranker.weights[key] = (ranker.weights[key] || 0) + rate * err * value;
+				}
+				trained += 1;
+			}
+			ranker.examples += trained;
+			ranker.solves += 1;
+			return trained;
+		}
+
+		function getEffectiveHeuristicConfig(term, explicitOverride = null, targetFunctions = null) {
+			let cfg = heuristicConfig;
+			if (explicitOverride && typeof explicitOverride === "object") {
+				cfg = { ...heuristicConfig, ...explicitOverride };
+			} else if (state.ml.enabled && term && term.kind === "func" && state.ml.models[term.name]) {
+				cfg = { ...heuristicConfig, ...state.ml.models[term.name].config };
+			}
+			if (targetFunctions && targetFunctions.size > 0) {
+				cfg = { ...cfg, targetFunctions };
+			}
+			return cfg;
+		}
+
+		async function runSingleSearch(term, maxVisited = 2500, options = {}) {
+			narrowingActive = Boolean(options.useNarrowing);
+			// Exhaustive mode (the `walk` command): map the entire reachable space in
+			// breadth-first order rather than steering toward a goal. Every neighbor is
+			// kept (no tolerance gate), priority is g alone so the queue is FIFO by
+			// depth, and reaching h=0 does not stop the traversal — the operator decides
+			// via the halt/continue prompt.
+			const exhaustive = Boolean(options.exhaustive);
+			const useRanker = state.ml.ranker.rank && Object.keys(state.ml.ranker.weights).length > 0;
+			// Only prompt/report a new best that beats what an earlier phase already found.
+			const promptThresholdH = Number.isFinite(options.promptThresholdH) ? options.promptThresholdH : Number.POSITIVE_INFINITY;
+			const collectDebug = Boolean(options.collectDebug);
+			const maxDebugSteps = Number.isFinite(options.maxDebugSteps) ? Math.max(1, Math.floor(options.maxDebugSteps)) : 60;
+			const maxDebugNeighborSamples = Number.isFinite(options.maxDebugNeighborSamples) ? Math.max(1, Math.floor(options.maxDebugNeighborSamples)) : 24;
+			const progressEvery = Number.isFinite(options.progressEvery) ? Math.max(1, Math.floor(options.progressEvery)) : 20;
+			const onProgress = typeof options.onProgress === "function" ? options.onProgress : null;
+			const isCanceled = typeof options.isCanceled === "function" ? options.isCanceled : null;
+			// interactive/onNewBest/liveGraph/onEdge/stepDelayMs let the interactive
+			// `walk` command drive this same A* engine instead of running its own
+			// separate BFS walker.
+			const interactive = Boolean(options.interactive);
+			const onNewBest = typeof options.onNewBest === "function" ? options.onNewBest : null;
+			const liveGraph = Boolean(options.liveGraph);
+			const onEdge = typeof options.onEdge === "function" ? options.onEdge : null;
+			const stepDelayMs = Number.isFinite(options.stepDelayMs) ? Math.max(0, options.stepDelayMs) : null;
+			const cfg = getEffectiveHeuristicConfig(term, options.configOverride || null, options.targetFunctions || null);
+			const successorDependentFunctions = computeSuccessorDependentFunctions();
+			const start = canonicalizeTerm(term);
+			const startKey = termToString(start);
+
+			// These may be supplied by the zig-zag driver so successive rounds accumulate
+			// one search rather than restarting from scratch each time.
+			const visited = options.sharedVisited || new Set();
+			const gCost = options.sharedGCost || new Map();
+			const parent = options.sharedParent || new Map();
+			const termsByKey = options.sharedTerms || new Map();
+			if (!termsByKey.has(startKey)) termsByKey.set(startKey, start);
+			if (!gCost.has(startKey)) gCost.set(startKey, 0);
+
+			// A* priority queue: f = g (steps from start) + h (structural heuristic)
+			const pq = new MinHeap();
+			const h0 = termHeuristic(start, cfg);
+			const seeds = (options.seeds && options.seeds.length > 0)
+				? options.seeds
+				: [{ key: startKey, g: 0 }];
+			for (const seed of seeds) {
+				const seedTerm = termsByKey.get(seed.key);
+				if (!seedTerm) continue;
+				const seedH = termHeuristic(seedTerm, cfg);
+				pq.push({ key: seed.key, f: exhaustive ? seed.g : seed.g + seedH, g: seed.g });
+			}
+			const exploredOrder = [];
+			const graphEdges = [];
+			const graphEdgeKeys = new Set();
+
+			// Exploration pool for the dual-queue strategy
+			const explorationPool = [];
+			let stepCount = 0;
+
+			// Carry the running best across zig-zag rounds so a later round can't
+			// "improve" onto something worse than what an earlier round already found.
+			let bestKey = options.initialBest ? options.initialBest.key : startKey;
+			let bestH = options.initialBest ? options.initialBest.h : h0;
+			let haltRequested = false;
+			let userHalted = false;
+			const tolerance = cfg.tolerance;
+			const explorationInterval = cfg.explorationInterval;
+			const explorationChance = cfg.explorationChance;
+
+			const debug = collectDebug ? {
+				start: startKey,
+				startH: h0,
+				bestH: h0,
+				visitedSkips: 0,
+				worseGSkips: 0,
+				gateSkips: 0,
+				enqueued: 0,
+				steps: [],
+				targetFunctions: cfg.targetFunctions ? [...cfg.targetFunctions].sort() : [],
+				successorDependentFunctions: [...successorDependentFunctions].sort()
+			} : null;
+
+			while (pq.size > 0 && exploredOrder.length < maxVisited && !haltRequested) {
+				if (isCanceled && isCanceled()) break;
+				stepCount++;
+				let entry;
+				// Occasionally pull from the exploration pool to avoid local minima.
+				// Exhaustive mode skips this: it maps the space in strict breadth-first
+				// order, so jumping around would only scramble the traversal.
+				const intervalPick = !exhaustive && explorationInterval > 0 && stepCount % explorationInterval === 0;
+				const chancePick = !exhaustive && explorationChance > 0 && Math.random() < explorationChance;
+				if ((intervalPick || chancePick) && explorationPool.length > 0) {
+					const sampleSize = Math.max(1, Math.floor(cfg.explorationPoolSample));
+					const idx = Math.floor(Math.random() * Math.min(explorationPool.length, sampleSize));
+					entry = explorationPool.splice(idx, 1)[0];
+				} else {
+					entry = pq.pop();
+				}
+
+				const { key: currentKey, g: gSoFar } = entry;
+				if (visited.has(currentKey)) {
+					if (debug) debug.visitedSkips += 1;
+					continue;
+				}
+				visited.add(currentKey);
+
+				const currentTerm = termsByKey.get(currentKey);
+				exploredOrder.push(currentKey);
+
+				const h = termHeuristic(currentTerm, cfg);
+				const stepDebug = debug && debug.steps.length < maxDebugSteps ? {
+					state: currentKey,
+					g: gSoFar,
+					h,
+					bestHBefore: bestH,
+					neighborsGenerated: 0,
+					enqueued: 0,
+					rejectedVisited: 0,
+					rejectedWorseG: 0,
+					rejectedGate: 0,
+					samples: []
+				} : null;
+				if (h < bestH) {
+					bestH = h;
+					bestKey = currentKey;
+					if (debug) debug.bestH = bestH;
+					if (bestH === 0 && !exhaustive) haltRequested = true; // reached a numeral/existential, or the target vocabulary
+				}
+
+				const neighbors = getRewriteNeighbors(currentTerm);
+				if (stepDebug) stepDebug.neighborsGenerated = neighbors.length;
+				for (const neighbor of neighbors) {
+					const key = termToString(neighbor.term);
+					const edgeKey = `${currentKey}=>${key}`;
+					if (!graphEdgeKeys.has(edgeKey)) {
+						graphEdgeKeys.add(edgeKey);
+						graphEdges.push({ from: currentKey, to: key, reason: neighbor.reason });
+						if (liveGraph && onEdge) onEdge(currentKey, key, neighbor.term, neighbor.reason);
+					}
+					if (visited.has(key)) {
+						if (debug) debug.visitedSkips += 1;
+						if (stepDebug) stepDebug.rejectedVisited += 1;
+						continue;
+					}
+
+					const newG = gSoFar + 1;
+					const oldG = gCost.get(key);
+					if (oldG !== undefined && oldG <= newG) {
+						if (debug) debug.worseGSkips += 1;
+						if (stepDebug) stepDebug.rejectedWorseG += 1;
+						continue;
+					}
+
+					const nH = termHeuristic(neighbor.term, cfg);
+					const reason = neighbor.reason || "";
+					// Narrowing/expanding reverses deliberately move uphill, so they must
+					// NOT count as unconditionally-useful rule rewrites — otherwise every
+					// term could grow without bound. They get their own bounded detour
+					// allowance instead.
+					const isNarrowing = reason.includes("(reverse, narrow") || reason.includes("(reverse, expand");
+					const isBaked = reason.startsWith("baked") && !isNarrowing;
+					const isRuleRewrite = reason.startsWith("rule ") && !isNarrowing;
+					const isNumberExpansion = reason.includes("expand-number");
+					const allowSuccessorDetour =
+						isNumberExpansion &&
+						termHasAnyFunction(currentTerm, successorDependentFunctions) &&
+						nH <= h + tolerance * cfg.successorDetourMultiplier;
+					const allowNarrowDetour =
+						isNarrowing && nH <= h + tolerance * cfg.narrowDetourMultiplier;
+					const forceUseful = isBaked || isRuleRewrite || allowSuccessorDetour || allowNarrowDetour;
+					const allowAlternatePath =
+						cfg.alternatePathChance > 0 &&
+						Math.random() < cfg.alternatePathChance &&
+						nH <= bestH + tolerance * cfg.alternatePathToleranceMultiplier;
+					// Tolerance gate: skip branches that are far worse than current best.
+					// Exhaustive mode keeps everything — the point is to map the space,
+					// not to prune it toward an answer.
+					if (exhaustive || nH <= bestH + tolerance || nH < h || forceUseful || allowAlternatePath) {
+						gCost.set(key, newG);
+						termsByKey.set(key, neighbor.term);
+						parent.set(key, { from: currentKey, reason: neighbor.reason });
+						// Exhaustive: priority is depth alone, making the heap a FIFO by
+						// round — the breadth-first frontier the original walk expanded.
+						// Otherwise the learned ranker (when enabled) nudges the ordering:
+						// it only shifts priority, never admissibility, so a low-scored
+						// edge is explored later rather than discarded.
+						let f = exhaustive ? newG : newG + nH;
+						if (!exhaustive && useRanker) {
+							const positionDepth = (reason.match(/@arg/g) || []).length;
+							const score = scoreEdgeFeatures(edgeFeatures(reason, h, nH, positionDepth));
+							f -= cfg.rankerWeight * Math.tanh(score);
+						}
+						pq.push({ key, f, g: newG });
+						explorationPool.push({ key, f, g: newG });
+						const poolLimit = Math.max(20, Math.floor(cfg.explorationPoolLimit));
+						const poolTrimTo = Math.max(10, Math.min(poolLimit - 1, Math.floor(cfg.explorationPoolTrimTo)));
+						if (explorationPool.length > poolLimit) explorationPool.splice(0, explorationPool.length - poolTrimTo);
+						if (debug) debug.enqueued += 1;
+						if (stepDebug) {
+							stepDebug.enqueued += 1;
+							if (stepDebug.samples.length < maxDebugNeighborSamples) {
+								stepDebug.samples.push(`+ ${key}  [h=${nH}, via ${reason}${allowAlternatePath ? ", alt-chance" : ""}]`);
+							}
+						}
+
+						// Track best-so-far the moment a better state is discovered, not
+						// only once it's popped — this is what lets an interactive caller
+						// (the `walk` command) prompt live as soon as a simpler state is
+						// found, and it also fixes stale "best" results when maxVisited
+						// runs out before the best-known state is ever popped.
+						if (nH < bestH) {
+							bestH = nH;
+							bestKey = key;
+							if (debug) debug.bestH = bestH;
+							if (bestH === 0 && !exhaustive) haltRequested = true;
+							if (interactive && onNewBest && bestH < promptThresholdH) {
+								const action = await onNewBest(bestKey, bestH, stepCount);
+								if (action === "halt") {
+									haltRequested = true;
+									userHalted = true;
+								}
+							}
+						}
+					} else {
+						if (debug) debug.gateSkips += 1;
+						if (stepDebug) {
+							stepDebug.rejectedGate += 1;
+							if (stepDebug.samples.length < maxDebugNeighborSamples) {
+								stepDebug.samples.push(`- ${key}  [h=${nH}, gated, via ${reason}]`);
+							}
+						}
+					}
+
+					if (haltRequested) break;
+				}
+				if (stepDebug) {
+					stepDebug.bestHAfter = bestH;
+					debug.steps.push(stepDebug);
+				}
+
+				if (onProgress) {
+					onProgress({ explored: exploredOrder.length, maxVisited, bestH, queueSize: pq.size });
+				}
+				if (exploredOrder.length % progressEvery === 0) {
+					await sleepFrame();
+				}
+				if (stepDelayMs !== null) {
+					await sleepWalkDelay(stepDelayMs, isCanceled);
+				}
+			}
+
+			// Walk back until a state with no recorded parent — the true origin. Across
+			// zig-zag rounds the parent map spans several rounds, so stopping at this
+			// round's startKey would truncate the derivation.
+			const path = [];
+			let cursor = bestKey;
+			const pathGuard = new Set();
+			while (!pathGuard.has(cursor)) {
+				pathGuard.add(cursor);
+				const edge = parent.get(cursor);
+				if (!edge) break;
+				path.push({
+					from: edge.from,
+					to: cursor,
+					reason: edge.reason
+				});
+				cursor = edge.from;
+			}
+			path.reverse();
+
+			return {
+				result: termsByKey.get(bestKey),
+				bestKey,
+				bestH,
+				exploredOrder,
+				path,
+				edges: graphEdges,
+				debug,
+				halted: userHalted,
+				canceled: Boolean(isCanceled && isCanceled())
+			};
+		}
+
+		// Two-phase search. Phase 1 runs ordinary rewriting only. Narrowing — running
+		// rules backwards and guessing unbound values — is a fallback that only runs if
+		// phase 1 failed to reach a solution, because it multiplies the branching factor
+		// enough to swamp plain evaluation (with it always on, M(3,4) never finishes).
+		// Whichever phase found the better state wins; each result is self-consistent,
+		// so the reported path always matches the reported answer.
+		async function solveByStateWalk(term, maxVisited = 2500, options = {}) {
+			// Exhaustive mapping isn't goal-directed, so there's no "phase 1 failed" to
+			// react to — narrowing edges are simply part of the space being mapped.
+			if (options.exhaustive) {
+				return runSingleSearch(term, maxVisited, { ...options, useNarrowing: state.narrow.enabled });
+			}
+
+			const start = canonicalizeTerm(term);
+			const startKey = termToString(start);
+			const cfg = getEffectiveHeuristicConfig(term, options.configOverride || null, options.targetFunctions || null);
+
+			// One search, accumulated across rounds — nothing is re-explored.
+			const shared = {
+				sharedVisited: new Set(),
+				sharedGCost: new Map([[startKey, 0]]),
+				sharedParent: new Map(),
+				sharedTerms: new Map([[startKey, start]])
+			};
+
+			const rounds = Math.max(1, Math.floor(state.narrow.zigzagRounds));
+			const phases = [];
+			let seeds = [{ key: startKey, g: 0 }];
+			let budget = maxVisited;
+			let best = null;
+			let lastRun = null;
+
+			for (let round = 0; round < rounds; round += 1) {
+				// ZIG — descend: ordinary rewriting only, steering toward simpler terms.
+				const zig = await runSingleSearch(term, budget, {
+					...options,
+					...shared,
+					useNarrowing: false,
+					seeds,
+					initialBest: best ? { key: best.bestKey, h: best.bestH } : null,
+					promptThresholdH: best ? best.bestH : options.promptThresholdH
+				});
+				phases.push({ label: `zig${round}`, explored: zig.exploredOrder.length, bestH: zig.bestH });
+				lastRun = zig;
+				best = (!best || zig.bestH < best.bestH) ? zig : best;
+				budget -= zig.exploredOrder.length;
+
+				if (best.bestH === 0 || budget <= 0 || zig.halted || zig.canceled) break;
+				if (!state.narrow.enabled || round === rounds - 1) break;
+
+				// ZAG — expand: the descent stalled, so deliberately move outward from the
+				// states it got stuck on. Narrowing is applied only at those stall points
+				// rather than at every node, which is what keeps the branching affordable.
+				seeds = buildZagSeeds(shared, zig, cfg);
+				phases.push({ label: `zag${round}`, expanded: seeds.length, bestH: best.bestH });
+				if (seeds.length === 0) break;
+			}
+
+			// Self-supervised: a solve that actually reached a goal is a labelled
+			// derivation, so learn from it before returning.
+			if (state.ml.ranker.learn && best && best.bestH === 0) {
+				trainRankerFromSolve(best);
+			}
+
+			const result = { ...best };
+			// Report every state the whole zig-zag actually touched, not just the round
+			// that happened to win — otherwise a long fruitless search looks like 4 states.
+			const seenStates = new Set();
+			const exploredOrder = [];
+			for (const key of shared.sharedVisited) {
+				if (seenStates.has(key)) continue;
+				seenStates.add(key);
+				exploredOrder.push(key);
+			}
+			result.exploredOrder = exploredOrder.length > 0 ? exploredOrder : best.exploredOrder;
+			result.edges = mergeEdgeLists(best, lastRun);
+			result.phases = phases;
+			return result;
+		}
+
+		// Pick the states a stalled descent got stuck on and expand outward from them.
+		function buildZagSeeds(shared, zig, cfg) {
+			const width = Math.max(1, Math.floor(state.narrow.zagWidth));
+			const ranked = [];
+			for (const key of zig.exploredOrder) {
+				const term = shared.sharedTerms.get(key);
+				if (!term) continue;
+				ranked.push({ key, term, h: termHeuristic(term, cfg) });
+			}
+			ranked.sort((a, b) => a.h - b.h);
+
+			const wasNarrowing = narrowingActive;
+			narrowingActive = true;
+			const seeds = [];
+			for (const entry of ranked.slice(0, width)) {
+				const fromG = shared.sharedGCost.get(entry.key) || 0;
+				for (const neighbor of getRewriteNeighbors(entry.term)) {
+					const key = termToString(neighbor.term);
+					if (shared.sharedVisited.has(key)) continue;
+					const newG = fromG + 1;
+					const oldG = shared.sharedGCost.get(key);
+					if (oldG !== undefined && oldG <= newG) continue;
+					shared.sharedGCost.set(key, newG);
+					shared.sharedTerms.set(key, neighbor.term);
+					shared.sharedParent.set(key, { from: entry.key, reason: neighbor.reason });
+					seeds.push({ key, g: newG });
+				}
+			}
+			narrowingActive = wasNarrowing;
+			return seeds;
+		}
+
+		function mergeEdgeLists(primary, secondary) {
+			const seen = new Set();
+			const edges = [];
+			for (const source of [primary, secondary]) {
+				if (!source || !source.edges) continue;
+				for (const edge of source.edges) {
+					const key = `${edge.from}=>${edge.to}`;
+					if (seen.has(key)) continue;
+					seen.add(key);
+					edges.push(edge);
+				}
+			}
+			return edges;
+		}
+
+		function ensureGraphCanvasSize() {
+			if (!debugRenderer || !debugCamera) return;
+			const rect = graphCanvas.getBoundingClientRect();
+			const width = Math.max(10, Math.floor(rect.width));
+			const height = Math.max(10, Math.floor(rect.height));
+			debugRenderer.setSize(width, height, false);
+			debugCamera.aspect = width / height;
+			debugCamera.updateProjectionMatrix();
+		}
+
+		function getTopHighlightCount() {
+			const raw = Number(graphTopCountInput.value);
+			if (!Number.isFinite(raw)) return 5;
+			return Math.max(1, Math.min(50, Math.floor(raw)));
+		}
+
+		function computeTopSimplifiedKeys(keys, termsByKey, topCount, cfg = heuristicConfig) {
+			const list = [];
+			for (const key of keys) {
+				const term = termsByKey.get(key);
+				if (!term) continue;
+				list.push({ key, h: termHeuristic(term, cfg) });
+			}
+			list.sort((a, b) => a.h - b.h);
+			return list.slice(0, topCount).map((item) => item.key);
+		}
+
+		function refreshGraphHighlights() {
+			if (!debugGraph.rankableKeys || debugGraph.rankableKeys.length === 0) {
+				debugGraph.highlightedKeys = new Set();
+				applyDebugNodeColors();
+				return;
+			}
+			const topCount = getTopHighlightCount();
+			const topKeys = computeTopSimplifiedKeys(debugGraph.rankableKeys, debugGraph.termsByKey, topCount, debugGraph.activeCfg || heuristicConfig);
+			debugGraph.highlightedKeys = new Set(topKeys);
+			applyDebugNodeColors();
+		}
+
+		function setupGraphSettingsUI() {
+			for (const [key, ui] of Object.entries(graphSettingInputs)) {
+				if (!ui || !ui.input || !ui.out) continue;
+				ui.input.value = String(debugGraphSettings[key]);
+				ui.out.textContent = String(debugGraphSettings[key]);
+				ui.input.addEventListener("input", () => {
+					const value = Number(ui.input.value);
+					if (!Number.isFinite(value)) return;
+					debugGraphSettings[key] = value;
+					ui.out.textContent = ui.input.value;
+					if (key === "nodeSize") {
+						for (const mesh of debugNodeMeshes) {
+							const s = value / 2.2;
+							mesh.scale.set(s, s, s);
+						}
+					}
+				});
+			}
+
+			graphSettingsBtn.addEventListener("click", () => {
+				graphSettingsPanel.classList.toggle("visible");
+			});
+
+			graphExportBtn.addEventListener("click", exportDebugGraphImage);
+
+			document.addEventListener("click", (event) => {
+				if (!graphPanel.classList.contains("visible")) return;
+				if (!graphSettingsPanel.classList.contains("visible")) return;
+				if (graphSettingsPanel.contains(event.target) || graphSettingsBtn.contains(event.target)) return;
+				graphSettingsPanel.classList.remove("visible");
+			});
+		}
+
+		function exportDebugGraphImage() {
+			if (!debugRenderer) {
+				print("No graph available to export.", "err");
+				return;
+			}
+			try {
+				drawDebugGraph();
+				const url = debugRenderer.domElement.toDataURL("image/png");
+				const link = document.createElement("a");
+				link.href = url;
+				link.download = "aximalpha-graph.png";
+				document.body.appendChild(link);
+				link.click();
+				link.remove();
+				print("Graph exported as aximalpha-graph.png");
+			} catch (error) {
+				print("Graph export failed.", "err");
+			}
+		}
+
+		function initDebugGraph3D() {
+			if (debugRenderer) return;
+
+			debugScene = new THREE.Scene();
+			debugScene.background = new THREE.Color(0x151b22);
+
+			const rect = graphCanvas.getBoundingClientRect();
+			const width = Math.max(10, Math.floor(rect.width));
+			const height = Math.max(10, Math.floor(rect.height));
+
+			debugCamera = new THREE.PerspectiveCamera(70, width / height, 0.1, 6000);
+			debugRenderer = new THREE.WebGLRenderer({ canvas: graphCanvas, antialias: true, alpha: false, preserveDrawingBuffer: true });
+			debugRenderer.setPixelRatio(window.devicePixelRatio || 1);
+			debugRenderer.setSize(width, height, false);
+
+			debugNodeGroup = new THREE.Group();
+			debugEdgeGroup = new THREE.Group();
+			debugScene.add(debugNodeGroup);
+			debugScene.add(debugEdgeGroup);
+
+			const light1 = new THREE.PointLight(0xffffff, 1.0, 1800);
+			light1.position.set(160, 140, 150);
+			debugScene.add(light1);
+			const light2 = new THREE.PointLight(0xffffff, 0.45, 1800);
+			light2.position.set(-140, -120, -130);
+			debugScene.add(light2);
+			debugScene.add(new THREE.AmbientLight(0xffffff, 0.35));
+
+			debugRaycaster = new THREE.Raycaster();
+			debugPointer = new THREE.Vector2();
+
+			graphCanvas.addEventListener("mousedown", onDebugMouseDown);
+			window.addEventListener("mousemove", onDebugMouseMove);
+			window.addEventListener("mouseup", onDebugMouseUp);
+			graphCanvas.addEventListener("wheel", onDebugMouseWheel, { passive: false });
+		}
+
+		function disposeDebugRenderables() {
+			for (const mesh of debugNodeMeshes) {
+				mesh.geometry.dispose();
+				mesh.material.dispose();
+			}
+			debugNodeMeshes = [];
+			if (debugNodeGroup) debugNodeGroup.clear();
+
+			if (debugEdgeLine) {
+				debugEdgeLine.geometry.dispose();
+				debugEdgeLine.material.dispose();
+				if (debugEdgeGroup) debugEdgeGroup.remove(debugEdgeLine);
+				debugEdgeLine = null;
+			}
+			debugEdgePositions = null;
+		}
+
+		function buildDebugGraph(solved) {
+			const states = [...solved.exploredOrder];
+
+			const nodeIndex = new Map();
+			const nodes = states.map((key, idx) => {
+				nodeIndex.set(key, idx);
+				return {
+					id: idx,
+					key,
+					x: (Math.random() - 0.5) * 160,
+					y: (Math.random() - 0.5) * 160,
+					z: (Math.random() - 0.5) * 160,
+					vx: 0,
+					vy: 0,
+					vz: 0,
+					fx: 0,
+					fy: 0,
+					fz: 0
+				};
+			});
+
+			const edges = [];
+			const seenEdges = new Set();
+			for (const edge of solved.edges || []) {
+				if (!nodeIndex.has(edge.from) || !nodeIndex.has(edge.to)) continue;
+				const a = nodeIndex.get(edge.from);
+				const b = nodeIndex.get(edge.to);
+				const k = a < b ? `${a}-${b}` : `${b}-${a}`;
+				if (seenEdges.has(k)) continue;
+				seenEdges.add(k);
+				edges.push({ source: a, target: b, reason: edge.reason });
+			}
+
+			if (edges.length === 0 && solved.path && solved.path.length > 0) {
+				for (const edge of solved.path) {
+					if (!nodeIndex.has(edge.from) || !nodeIndex.has(edge.to)) continue;
+					edges.push({
+						source: nodeIndex.get(edge.from),
+						target: nodeIndex.get(edge.to),
+						reason: edge.reason
+					});
+				}
+			}
+
+			debugGraph.nodes = nodes;
+			debugGraph.edges = edges;
+			debugGraph.nodeIndexByKey = new Map();
+			for (const node of debugGraph.nodes) debugGraph.nodeIndexByKey.set(node.key, node.id);
+			debugGraph.edgeKeySet = new Set();
+			for (const edge of debugGraph.edges) debugGraph.edgeKeySet.add(`${edge.source}=>${edge.target}`);
+			debugGraph.selectedNodeId = null;
+			graphSelectedState.textContent = "(none)";
+			rebuildDebugRenderables();
+			fitDebugCameraToGraph();
+		}
+
+		function rebuildDebugEdgeRenderable() {
+			if (!debugEdgeGroup) return;
+			if (debugEdgeLine) {
+				debugEdgeLine.geometry.dispose();
+				debugEdgeLine.material.dispose();
+				debugEdgeGroup.remove(debugEdgeLine);
+				debugEdgeLine = null;
+			}
+			debugEdgePositions = new Float32Array(debugGraph.edges.length * 6);
+			const edgeGeometry = new THREE.BufferGeometry();
+			edgeGeometry.setAttribute("position", new THREE.BufferAttribute(debugEdgePositions, 3));
+			const edgeMaterial = new THREE.LineBasicMaterial({ color: 0x9baec5, transparent: true, opacity: 0.35 });
+			debugEdgeLine = new THREE.LineSegments(edgeGeometry, edgeMaterial);
+			debugEdgeGroup.add(debugEdgeLine);
+			updateDebugEdgePositions();
+		}
+
+		function appendDebugGraphState(fromKey, toKey, toTerm, reason) {
+			if (!debugNodeGroup || !debugEdgeGroup) return false;
+			const fromId = debugGraph.nodeIndexByKey.get(fromKey);
+			if (fromId === undefined) return false;
+
+			let toId = debugGraph.nodeIndexByKey.get(toKey);
+			let addedNode = false;
+			if (toId === undefined) {
+				// Visualization cap only — the search itself keeps running past this.
+				if (debugGraph.nodes.length >= debugGraph.maxLiveNodes) {
+					debugGraph.truncated = true;
+					return false;
+				}
+				const fromNode = debugGraph.nodes[fromId];
+				toId = debugGraph.nodes.length;
+				const node = {
+					id: toId,
+					key: toKey,
+					x: (fromNode ? fromNode.x : 0) + (Math.random() - 0.5) * 26,
+					y: (fromNode ? fromNode.y : 0) + (Math.random() - 0.5) * 26,
+					z: (fromNode ? fromNode.z : 0) + (Math.random() - 0.5) * 26,
+					vx: 0,
+					vy: 0,
+					vz: 0,
+					fx: 0,
+					fy: 0,
+					fz: 0
+				};
+				debugGraph.nodes.push(node);
+				debugGraph.nodeIndexByKey.set(toKey, toId);
+				const geometry = new THREE.SphereGeometry(2.2, 12, 12);
+				const material = new THREE.MeshPhongMaterial({ color: 0x66c2ff });
+				const mesh = new THREE.Mesh(geometry, material);
+				const nodeScale = debugGraphSettings.nodeSize / 2.2;
+				mesh.scale.set(nodeScale, nodeScale, nodeScale);
+				mesh.position.set(node.x, node.y, node.z);
+				mesh.userData.nodeId = node.id;
+				debugNodeMeshes.push(mesh);
+				debugNodeGroup.add(mesh);
+				addedNode = true;
+			}
+
+			const eKey = `${fromId}=>${toId}`;
+			if (!debugGraph.edgeKeySet.has(eKey)) {
+				debugGraph.edgeKeySet.add(eKey);
+				debugGraph.edges.push({ source: fromId, target: toId, reason });
+				debugGraph.pendingEdgeRebuild = true;
+			}
+
+			if (addedNode) {
+				debugGraph.rankableKeys.push(toKey);
+				debugGraph.termsByKey.set(toKey, cloneTerm(toTerm));
+			}
+			// Coalesced into the animation frame — see debugGraph.pendingEdgeRebuild.
+			debugGraph.pendingHighlightRefresh = true;
+			return addedNode;
+		}
+
+		function rebuildDebugRenderables() {
+			disposeDebugRenderables();
+			if (!debugNodeGroup || !debugEdgeGroup) return;
+
+			for (const node of debugGraph.nodes) {
+				const geometry = new THREE.SphereGeometry(2.2, 12, 12);
+				const material = new THREE.MeshPhongMaterial({ color: 0x66c2ff });
+				const mesh = new THREE.Mesh(geometry, material);
+				const nodeScale = debugGraphSettings.nodeSize / 2.2;
+				mesh.scale.set(nodeScale, nodeScale, nodeScale);
+				mesh.position.set(node.x, node.y, node.z);
+				mesh.userData.nodeId = node.id;
+				debugNodeMeshes.push(mesh);
+				debugNodeGroup.add(mesh);
+			}
+
+			debugEdgePositions = new Float32Array(debugGraph.edges.length * 6);
+			const edgeGeometry = new THREE.BufferGeometry();
+			edgeGeometry.setAttribute("position", new THREE.BufferAttribute(debugEdgePositions, 3));
+			const edgeMaterial = new THREE.LineBasicMaterial({ color: 0x9baec5, transparent: true, opacity: 0.35 });
+			debugEdgeLine = new THREE.LineSegments(edgeGeometry, edgeMaterial);
+			debugEdgeGroup.add(debugEdgeLine);
+			updateDebugEdgePositions();
+			applyDebugNodeColors();
+		}
+
+		function updateDebugEdgePositions() {
+			if (!debugEdgePositions || !debugEdgeLine) return;
+			let ptr = 0;
+			for (const edge of debugGraph.edges) {
+				const a = debugGraph.nodes[edge.source];
+				const b = debugGraph.nodes[edge.target];
+				if (!a || !b) continue;
+				debugEdgePositions[ptr++] = a.x;
+				debugEdgePositions[ptr++] = a.y;
+				debugEdgePositions[ptr++] = a.z;
+				debugEdgePositions[ptr++] = b.x;
+				debugEdgePositions[ptr++] = b.y;
+				debugEdgePositions[ptr++] = b.z;
+			}
+			debugEdgeLine.geometry.attributes.position.needsUpdate = true;
+			debugEdgeLine.geometry.computeBoundingSphere();
+		}
+
+		function applyDebugNodeColors() {
+			for (let i = 0; i < debugNodeMeshes.length; i += 1) {
+				const mesh = debugNodeMeshes[i];
+				const node = debugGraph.nodes[i];
+				if (!mesh || !node) continue;
+				const isSelected = node.id === debugGraph.selectedNodeId;
+				const isHighlighted = debugGraph.highlightedKeys.has(node.key);
+				if (isSelected) {
+					mesh.material.color.setHex(0xffcc66);
+				} else if (isHighlighted) {
+					mesh.material.color.setHex(0x57d86c);
+				} else {
+					mesh.material.color.setHex(0x66c2ff);
+				}
+			}
+		}
+
+		function fitDebugCameraToGraph() {
+			if (!debugCamera || debugGraph.nodes.length === 0) return;
+			let maxR = 10;
+			for (const node of debugGraph.nodes) {
+				const r = Math.sqrt(node.x * node.x + node.y * node.y + node.z * node.z);
+				if (r > maxR) maxR = r;
+			}
+			debugCameraControls.radius = Math.max(80, maxR * 2.8);
+			updateDebugCamera();
+		}
+
+		function updateDebugCamera() {
+			if (!debugCamera) return;
+			const r = debugCameraControls.radius;
+			const rx = debugCameraControls.rotX;
+			const ry = debugCameraControls.rotY;
+			debugCamera.position.x = r * Math.cos(rx) * Math.sin(ry);
+			debugCamera.position.y = r * Math.sin(rx);
+			debugCamera.position.z = r * Math.cos(rx) * Math.cos(ry);
+			debugCamera.lookAt(0, 0, 0);
+		}
+
+		function onDebugMouseDown(event) {
+			if (!graphPanel.classList.contains("visible")) return;
+			if (event.button !== 0) return;
+			debugIsRotating = true;
+			debugLastMouseX = event.clientX;
+			debugLastMouseY = event.clientY;
+			debugMouseDownX = event.clientX;
+			debugMouseDownY = event.clientY;
+		}
+
+		function onDebugMouseMove(event) {
+			if (!debugIsRotating) return;
+			const dx = event.clientX - debugLastMouseX;
+			const dy = event.clientY - debugLastMouseY;
+			debugLastMouseX = event.clientX;
+			debugLastMouseY = event.clientY;
+			debugCameraControls.rotY += dx * 0.008;
+			debugCameraControls.rotX += dy * 0.008;
+			debugCameraControls.rotX = Math.max(-Math.PI / 2 + 0.05, Math.min(Math.PI / 2 - 0.05, debugCameraControls.rotX));
+		}
+
+		function onDebugMouseUp(event) {
+			if (event && debugIsRotating) {
+				const dragDistance = Math.hypot(event.clientX - debugMouseDownX, event.clientY - debugMouseDownY);
+				if (dragDistance < 4) {
+					pickDebugNode(event.clientX, event.clientY);
+				}
+			}
+			debugIsRotating = false;
+		}
+
+		function onDebugMouseWheel(event) {
+			if (!graphPanel.classList.contains("visible")) return;
+			event.preventDefault();
+			debugCameraControls.radius += event.deltaY * 0.08;
+			debugCameraControls.radius = Math.max(25, Math.min(3000, debugCameraControls.radius));
+		}
+
+		function pickDebugNode(clientX, clientY) {
+			if (!debugCamera || !debugRaycaster || debugNodeMeshes.length === 0) return;
+			const rect = graphCanvas.getBoundingClientRect();
+			const nx = ((clientX - rect.left) / rect.width) * 2 - 1;
+			const ny = -((clientY - rect.top) / rect.height) * 2 + 1;
+			debugPointer.set(nx, ny);
+			debugRaycaster.setFromCamera(debugPointer, debugCamera);
+			debugRaycaster.far = Math.max(1000, debugCameraControls.radius * 2);
+			const hits = debugRaycaster.intersectObjects(debugNodeMeshes, false);
+			if (hits.length === 0) return;
+			const id = hits[0].object.userData.nodeId;
+			debugGraph.selectedNodeId = id;
+			const node = debugGraph.nodes.find((n) => n.id === id);
+			graphSelectedState.textContent = node ? node.key : "(none)";
+			applyDebugNodeColors();
+		}
+
+		function simulateDebugGraphStep() {
+			const nodes = debugGraph.nodes;
+			const edges = debugGraph.edges;
+			if (nodes.length === 0) return;
+
+			const repulsion = debugGraphSettings.repulsion;
+			const spring = debugGraphSettings.spring;
+			const targetLength = debugGraphSettings.edgeLength;
+			const damping = debugGraphSettings.damping;
+			const collisionPush = 0.12;
+			const minDistance = debugGraphSettings.minDistance;
+			const centering = 0.0007;
+			const maxSpeed = 2.2;
+
+			for (const node of nodes) {
+				node.fx = -node.x * centering;
+				node.fy = -node.y * centering;
+				node.fz = -node.z * centering;
+			}
+
+			for (let i = 0; i < nodes.length; i += 1) {
+				const a = nodes[i];
+				for (let j = i + 1; j < nodes.length; j += 1) {
+					const b = nodes[j];
+					let dx = a.x - b.x;
+					let dy = a.y - b.y;
+					let dz = a.z - b.z;
+					let distSq = dx * dx + dy * dy + dz * dz;
+					if (distSq < 0.0001) {
+						dx = (Math.random() - 0.5) * 0.1;
+						dy = (Math.random() - 0.5) * 0.1;
+						dz = (Math.random() - 0.5) * 0.1;
+						distSq = dx * dx + dy * dy + dz * dz;
+					}
+					const dist = Math.sqrt(distSq);
+					let force = repulsion / distSq;
+					if (dist < minDistance) {
+						force += (minDistance - dist) * collisionPush;
+					}
+					const fx = (dx / dist) * force;
+					const fy = (dy / dist) * force;
+					const fz = (dz / dist) * force;
+					a.fx += fx;
+					a.fy += fy;
+					a.fz += fz;
+					b.fx -= fx;
+					b.fy -= fy;
+					b.fz -= fz;
+				}
+			}
+
+			for (const edge of edges) {
+				const a = nodes[edge.source];
+				const b = nodes[edge.target];
+				const dx = b.x - a.x;
+				const dy = b.y - a.y;
+				const dz = b.z - a.z;
+				const dist = Math.sqrt(dx * dx + dy * dy + dz * dz) || 0.0001;
+				const displacement = dist - targetLength;
+				const force = spring * displacement;
+				const fx = (dx / dist) * force;
+				const fy = (dy / dist) * force;
+				const fz = (dz / dist) * force;
+				a.fx += fx;
+				a.fy += fy;
+				a.fz += fz;
+				b.fx -= fx;
+				b.fy -= fy;
+				b.fz -= fz;
+			}
+
+			for (const node of nodes) {
+				node.vx = (node.vx + node.fx) * damping;
+				node.vy = (node.vy + node.fy) * damping;
+				node.vz = (node.vz + node.fz) * damping;
+
+				const speed = Math.sqrt(node.vx * node.vx + node.vy * node.vy + node.vz * node.vz);
+				if (speed > maxSpeed) {
+					const cap = maxSpeed / speed;
+					node.vx *= cap;
+					node.vy *= cap;
+					node.vz *= cap;
+				}
+
+				node.x += node.vx;
+				node.y += node.vy;
+				node.z += node.vz;
+			}
+
+			for (let i = 0; i < debugNodeMeshes.length; i += 1) {
+				const mesh = debugNodeMeshes[i];
+				const node = nodes[i];
+				if (!mesh || !node) continue;
+				mesh.position.set(node.x, node.y, node.z);
+			}
+			updateDebugEdgePositions();
+			fitDebugCameraToGraph();
+		}
+
+		function drawDebugGraph() {
+			if (!debugRenderer || !debugScene || !debugCamera) return;
+			ensureGraphCanvasSize();
+			updateDebugCamera();
+			debugRenderer.render(debugScene, debugCamera);
+		}
+
+		function runDebugGraphFrame() {
+			if (!debugGraph.running) return;
+			// Flush whatever the walk appended since the last frame, once, instead of
+			// once per edge.
+			if (debugGraph.pendingEdgeRebuild) {
+				debugGraph.pendingEdgeRebuild = false;
+				rebuildDebugEdgeRenderable();
+			}
+			if (debugGraph.pendingHighlightRefresh) {
+				debugGraph.pendingHighlightRefresh = false;
+				refreshGraphHighlights();
+			}
+			simulateDebugGraphStep();
+			drawDebugGraph();
+			requestAnimationFrame(runDebugGraphFrame);
+		}
+
+		function showDebugGraph(solved, highlightedKeys = [], termsByKey = null, cfg = null) {
+			appRoot.classList.add("graph-visible");
+			graphPanel.classList.add("visible");
+			initDebugGraph3D();
+			ensureGraphCanvasSize();
+			solved.preferredKeys = highlightedKeys;
+			buildDebugGraph(solved);
+			debugGraph.highlightedKeys = new Set(highlightedKeys);
+			debugGraph.rankableKeys = solved.exploredOrder ? [...solved.exploredOrder] : [];
+			debugGraph.termsByKey = termsByKey || new Map();
+			debugGraph.activeCfg = cfg;
+			debugGraph.pendingEdgeRebuild = false;
+			debugGraph.pendingHighlightRefresh = false;
+			debugGraph.truncated = false;
+			if (debugGraph.termsByKey.size > 0) {
+				refreshGraphHighlights();
+			}
+			drawDebugGraph();
+			if (!debugGraph.running) {
+				debugGraph.running = true;
+				requestAnimationFrame(runDebugGraphFrame);
+			}
+		}
+
+		function hideDebugGraph() {
+			appRoot.classList.remove("graph-visible");
+			graphPanel.classList.remove("visible");
+			debugGraph.running = false;
+			debugGraph.nodes = [];
+			debugGraph.edges = [];
+			debugGraph.nodeIndexByKey = new Map();
+			debugGraph.edgeKeySet = new Set();
+			debugGraph.selectedNodeId = null;
+			debugGraph.highlightedKeys = new Set();
+			debugGraph.rankableKeys = [];
+			debugGraph.termsByKey = new Map();
+			debugGraph.pendingEdgeRebuild = false;
+			debugGraph.pendingHighlightRefresh = false;
+			debugGraph.truncated = false;
+			disposeDebugRenderables();
+			graphSelectedState.textContent = "(none)";
+			graphSettingsPanel.classList.remove("visible");
+		}
+
+		window.addEventListener("resize", () => {
+			if (!graphPanel.classList.contains("visible")) return;
+			ensureGraphCanvasSize();
+			drawDebugGraph();
+		});
+
+		graphTopCountInput.addEventListener("input", () => {
+			graphTopCountInput.value = String(getTopHighlightCount());
+			refreshGraphHighlights();
+			drawDebugGraph();
+		});
+
+		graphCanvas.addEventListener("click", (event) => {
+			if (!graphPanel.classList.contains("visible")) return;
+			pickDebugNode(event.clientX, event.clientY);
+			drawDebugGraph();
+		});
+
+		async function runPathsCommand(maxVisitedText, expressionText) {
+			const maxVisited = Number(maxVisitedText);
+			if (!Number.isFinite(maxVisited) || maxVisited < 1) {
+				print("Usage: paths [maxVisited>=1] [expression]", "err");
+				return;
+			}
+
+			const { expressionText: exprOnly, targetFunctions } = parseExpressionWithTarget(expressionText);
+			const parsed = parseExpression(exprOnly);
+			const cfg = getEffectiveHeuristicConfig(parsed, null, targetFunctions);
+			const solved = await solveWithProgress(parsed, Math.floor(maxVisited), {
+				label: `Paths ${termToString(parsed)}`,
+				cancellable: true,
+				targetFunctions
+			});
+			if (!solved) return;
+
+			const stateKeySet = new Set(solved.exploredOrder);
+			for (const edge of solved.edges || []) {
+				stateKeySet.add(edge.from);
+				stateKeySet.add(edge.to);
+			}
+			const stateKeys = [...stateKeySet];
+
+			const termsByKey = new Map();
+			for (const key of stateKeys) {
+				try {
+					termsByKey.set(key, parseExpression(key));
+				} catch {}
+			}
+			const topCount = getTopHighlightCount();
+			const topKeys = computeTopSimplifiedKeys(stateKeys, termsByKey, topCount, cfg);
+
+			showDebugGraph({
+				exploredOrder: stateKeys,
+				edges: solved.edges,
+				path: solved.path
+			}, topKeys, termsByKey, cfg);
+
+			print(`Paths mapped states: ${stateKeys.length} (heuristic expanded ${solved.exploredOrder.length}, maxVisited=${Math.floor(maxVisited)})`);
+			for (let i = 0; i < stateKeys.length; i += 1) {
+				print(`  [${i}] ${stateKeys[i]}`);
+			}
+			print(`Top ${topKeys.length} simplified states:`);
+			for (let i = 0; i < topKeys.length; i += 1) {
+				print(`  #${i + 1} ${topKeys[i]}`);
+			}
+		}
+
+		function edgePathToNodePath(startKey, edgePath) {
+			const nodePath = [{ key: startKey, reason: null }];
+			for (const edge of edgePath) {
+				nodePath.push({ key: edge.to, reason: edge.reason });
+			}
+			return nodePath;
+		}
+
+		function printWalkPath(path) {
+			const steps = path.length - 1;
+			print(`Shortest path (${steps} step${steps === 1 ? "" : "s"}):`
+				, steps === 0 ? "info" : "ok");
+			for (let i = 0; i < path.length; i++) {
+				const { key, reason } = path[i];
+				const label = i === 0 ? `  [start] ${key}` : `  [${i}] ${key}`;
+				const suffix = (i > 0 && reason) ? `   ← ${reason}` : "";
+				print(label + suffix);
+			}
+		}
+
+		async function mlTrainOnWalkExample(startTerm) {
+			const functionName = startTerm.kind === "func" ? startTerm.name : null;
+			if (!functionName) {
+				print("ML: start term is not a function application — skipping training.", "info");
+				return;
+			}
+			const populationSize = 6;
+			const generations = 4;
+			const solveBudget = 700;
+			const progress = createAsyncProgressBar(
+				`ML walk-train ${functionName}`, populationSize * generations, true
+			);
+			let bestConfig = state.ml.models[functionName]
+				? { ...state.ml.models[functionName].config }
+				: { ...heuristicConfig };
+			let bestScore = Number.POSITIVE_INFINITY;
+			let done = 0;
+			for (let gen = 0; gen < generations; gen += 1) {
+				if (progress.isCanceled()) break;
+				const population = [
+					{ config: { ...bestConfig }, score: Number.POSITIVE_INFINITY }
+				];
+				for (let i = 1; i < populationSize; i += 1) {
+					population.push({
+						config: mutateHeuristicConfig(bestConfig, 1 + gen * 0.2),
+						score: Number.POSITIVE_INFINITY
+					});
+				}
+				for (const candidate of population) {
+					if (progress.isCanceled()) break;
+					const solved = await solveByStateWalk(cloneTerm(startTerm), solveBudget, {
+						configOverride: candidate.config,
+						progressEvery: 18,
+						isCanceled: progress.isCanceled
+					});
+					candidate.score = scoreSolveOutcome(solved);
+					done++;
+					progress.update(
+						done, populationSize * generations,
+						`ML walk-train ${functionName}: gen ${gen + 1}/${generations}`
+					);
+					await sleepFrame();
+				}
+				population.sort((a, b) => a.score - b.score);
+				if (population[0].score < bestScore) {
+					bestScore = population[0].score;
+					bestConfig = { ...population[0].config };
+				}
+			}
+			if (progress.isCanceled()) {
+				progress.finish(`ML walk-training canceled for ${functionName}.`, "#ffb36b");
+				return;
+			}
+			state.ml.models[functionName] = {
+				config: { ...bestConfig },
+				score: bestScore,
+				trainedAt: new Date().toISOString()
+			};
+			progress.finish(
+				`ML walk-trained ${functionName}. score=${bestScore.toFixed(4)}`, "#7eb8ff"
+			);
+			print(`ML model updated for ${functionName} from walk path.`);
+		}
+
+		async function finishWalk(label, bestKey, bestH, exploredSize, edgePath, startKey, resultTerm, startTerm) {
+			const normalized = resultTerm ? normalizeSuccessorNumerals(resultTerm) : null;
+			print(`${label}: ${bestKey} (h=${bestH})`);
+			if (normalized && resultTerm && !isEqual(resultTerm, normalized)) {
+				print(`  Normalized: ${termToString(normalized)}`);
+			}
+			print(`Walk explored ${exploredSize} state${exploredSize === 1 ? "" : "s"} total.`);
+			if (debugGraph.truncated) {
+				print(`  (graph view capped at ${debugGraph.maxLiveNodes} nodes; the search itself was not limited)`);
+			}
+			printWalkPath(edgePathToNodePath(startKey, edgePath));
+			if (state.ml.enabled) {
+				print("ML is on — training on walk path...");
+				await mlTrainOnWalkExample(startTerm);
+			}
+		}
+
+		// `walk` maps the whole reachable state space, breadth-first — it is NOT the
+		// goal-directed search that evaluate/debug/bake use. It shares their engine
+		// (and its neighbor cache), but runs it in exhaustive mode: no tolerance gate,
+		// depth-ordered frontier, and it keeps going after finding a solution, leaving
+		// the decision to stop with the operator via the halt/continue prompt.
+		async function runWalkCommand(delayMsText, expressionText) {
+			const delayMs = Number(delayMsText);
+			if (!Number.isFinite(delayMs) || delayMs < 0) {
+				print("Usage: walk [delayMs>=0] [expression]", "err");
+				return;
+			}
+			if (walkRuntime.active) {
+				print("A walk is already running. Use 'stop' first.", "err");
+				return;
+			}
+
+			walkRuntime.active = true;
+			walkRuntime.stopRequested = false;
+			walkRuntime.pendingDecisionResolve = null;
+
+			try {
+				const { expressionText: exprOnly, targetFunctions } = parseExpressionWithTarget(expressionText);
+				const parsed = parseExpression(exprOnly);
+				const start = cloneTerm(parsed);
+				const startKey = termToString(start);
+				const cfg = getEffectiveHeuristicConfig(parsed, null, targetFunctions);
+				const startH = termHeuristic(start, cfg);
+
+				showDebugGraph(
+					{ exploredOrder: [startKey], edges: [], path: [] },
+					[startKey],
+					new Map([[startKey, start]]),
+					cfg
+				);
+				const targetNote = targetFunctions ? `, target=${[...targetFunctions].join(",")}` : "";
+				print(`Walk started: ${startKey} (h=${startH}, delay=${Math.floor(delayMs)}ms${targetNote})`);
+
+				let round = 0;
+				const solved = await solveByStateWalk(parsed, Number.POSITIVE_INFINITY, {
+					interactive: true,
+					exhaustive: true,
+					stepDelayMs: delayMs,
+					progressEvery: 1,
+					liveGraph: true,
+					targetFunctions,
+					onEdge: (fromKey, toKey, toTerm, reason) => appendDebugGraphState(fromKey, toKey, toTerm, reason),
+					onNewBest: async (bestKey, bestH) => {
+						round += 1;
+						const action = await promptWalkDecision(bestKey, round, bestH);
+						if (action === "continue") print("Walk continuing...");
+						return action;
+					},
+					isCanceled: () => walkRuntime.stopRequested
+				});
+
+				const label = solved.halted
+					? "Walk halted — simplest found"
+					: walkRuntime.stopRequested
+						? "Walk stopped — best found so far"
+						: "Walk complete — best found";
+
+				await finishWalk(label, solved.bestKey, solved.bestH, solved.exploredOrder.length,
+					solved.path, startKey, solved.result, start);
+			} finally {
+				walkRuntime.active = false;
+				walkRuntime.pendingDecisionResolve = null;
+				walkRuntime.stopRequested = false;
+			}
+		}
+
+		function normalizeSuccessorNumerals(term) {
+			if (term.kind === "num" || term.kind === "var") {
+				return cloneTerm(term);
+			}
+
+			const normalizedArgs = term.args.map(normalizeSuccessorNumerals);
+			const normalized = {
+				kind: "func",
+				name: term.name,
+				args: normalizedArgs
+			};
+
+			if (
+				normalized.kind === "func" &&
+				normalized.name === "S" &&
+				normalized.args.length === 1 &&
+				normalized.args[0].kind === "num"
+			) {
+				return {
+					kind: "num",
+					value: normalized.args[0].value + 1
+				};
+			}
+
+			return normalized;
+		}
+
+		function collectVariableNames(term, out = new Set()) {
+			if (term.kind === "var") {
+				out.add(term.name);
+				return out;
+			}
+			if (term.kind === "func") {
+				for (const arg of term.args) collectVariableNames(arg, out);
+			}
+			return out;
+		}
+
+		function instantiateWithAssignment(term, assignment) {
+			if (term.kind === "num") return cloneTerm(term);
+			if (term.kind === "var") {
+				if (assignment.hasOwnProperty(term.name)) {
+					return { kind: "num", value: assignment[term.name] };
+				}
+				return cloneTerm(term);
+			}
+			return {
+				kind: "func",
+				name: term.name,
+				args: term.args.map((arg) => instantiateWithAssignment(arg, assignment))
+			};
+		}
+
+		function buildEvaluateAssignments(varNames, bound) {
+			const assignments = [];
+			const options = [];
+			for (let n = 0; n <= bound; n += 1) options.push(n);
+			options.push(null);
+
+			function walk(idx, assignment, replacedCount, unboundCount) {
+				if (idx === varNames.length) {
+					if (replacedCount > 0 && unboundCount > 0) assignments.push({ ...assignment });
+					return;
+				}
+				const name = varNames[idx];
+				for (const value of options) {
+					if (value === null) {
+						walk(idx + 1, assignment, replacedCount, unboundCount + 1);
+					} else {
+						assignment[name] = value;
+						walk(idx + 1, assignment, replacedCount + 1, unboundCount);
+						delete assignment[name];
+					}
+				}
+			}
+
+			walk(0, {}, 0, 0);
+			return assignments;
+		}
+
+		function addDiscoveredAxiom(lhs, rhs, meta = {}) {
+			for (const rule of state.rules) {
+				if (isEqual(rule.lhs, lhs) && isEqual(rule.rhs, rhs)) {
+					return { added: false, source: `${termToString(lhs)}=${termToString(rhs)}` };
+				}
+			}
+			const source = `${termToString(lhs)}=${termToString(rhs)}`;
+			state.rules.push({ lhs: cloneTerm(lhs), rhs: cloneTerm(rhs), source, discovered: true, ...meta });
+			invalidateRewriteCache();
+			collectFunctionNames(lhs, state.knownFunctions);
+			collectFunctionNames(rhs, state.knownFunctions);
+			return { added: true, source };
+		}
+
+		async function evaluateAndDiscover(bound, source, options = {}) {
+			const debug = Boolean(options.debug);
+			const parsed = parseExpression(source);
+			const variables = [...collectVariableNames(parsed)].sort();
+			if (variables.length === 0) {
+				print("evaluate expects an expression with variables.", "err");
+				return { found: [], tested: 0 };
+			}
+
+			const assignments = buildEvaluateAssignments(variables, bound);
+			const found = [];
+			let tested = 0;
+			const solveBudget = 1200;
+			for (const assignment of assignments) {
+				const lhs = instantiateWithAssignment(parsed, assignment);
+				const solved = await solveByStateWalk(lhs, solveBudget, { progressEvery: 20 });
+				tested += 1;
+				if (!solved || !solved.result) continue;
+				const rhs = normalizeSuccessorNumerals(solved.result);
+				maybeAutoBake(lhs, solved.result);
+				if (isEqual(lhs, rhs)) continue;
+				const add = addDiscoveredAxiom(lhs, rhs, {
+					discovery: "evaluate",
+					bound,
+					template: termToString(parsed)
+				});
+				if (add.added) {
+					found.push(add.source);
+					if (debug) print(`  learned: ${add.source}`);
+				}
+				if (tested % 6 === 0) await sleepFrame();
+			}
+
+			if (
+				parsed.kind === "func" &&
+				parsed.args.length === 2 &&
+				parsed.args[0].kind === "var" &&
+				parsed.args[1].kind === "var" &&
+				parsed.args[0].name !== parsed.args[1].name
+			) {
+				const xName = parsed.args[0].name;
+				const yName = parsed.args[1].name;
+				let commutativeOnBound = true;
+				for (let a = 0; a <= bound && commutativeOnBound; a += 1) {
+					for (let b = 0; b <= bound; b += 1) {
+						const left = instantiateWithAssignment(parsed, { [xName]: a, [yName]: b });
+						const right = instantiateWithAssignment(parsed, { [xName]: b, [yName]: a });
+						const solvedLeft = await solveByStateWalk(left, solveBudget, { progressEvery: 20 });
+						const solvedRight = await solveByStateWalk(right, solveBudget, { progressEvery: 20 });
+						tested += 2;
+						if (!solvedLeft || !solvedRight || !solvedLeft.result || !solvedRight.result) {
+							commutativeOnBound = false;
+							break;
+						}
+						const nLeft = normalizeSuccessorNumerals(solvedLeft.result);
+						const nRight = normalizeSuccessorNumerals(solvedRight.result);
+						if (!isEqual(nLeft, nRight)) {
+							commutativeOnBound = false;
+							break;
+						}
+						if (tested % 6 === 0) await sleepFrame();
+					}
+				}
+				if (commutativeOnBound) {
+					const commLhs = cloneTerm(parsed);
+					const commRhs = {
+						kind: "func",
+						name: parsed.name,
+						args: [cloneTerm(parsed.args[1]), cloneTerm(parsed.args[0])]
+					};
+					const add = addDiscoveredAxiom(commLhs, commRhs, {
+						discovery: "evaluate-commutativity",
+						bound,
+						template: termToString(parsed)
+					});
+					if (add.added) {
+						found.push(add.source);
+						if (debug) print(`  learned: ${add.source}`);
+					}
+				}
+			}
+
+			return { found, tested, template: termToString(parsed) };
+		}
+
+
+
+		function addRule(source) {
+			const { lhs, rhs } = parseEquation(source);
+			state.rules.push({ lhs, rhs, source });
+			invalidateRewriteCache();
+
+			const before = new Set(state.knownFunctions);
+			collectFunctionNames(lhs, state.knownFunctions);
+			collectFunctionNames(rhs, state.knownFunctions);
+
+			const newFns = [...state.knownFunctions].filter((name) => !before.has(name) && name !== "S");
+			if (newFns.length === 1) {
+				print(`${newFns[0]} defined.`);
+			} else if (newFns.length > 1) {
+				print(`${newFns.join(", ")} defined.`);
+			} else {
+				print("Rule added.");
+			}
+		}
+
+		function removeFunction(name) {
+			if (!name) {
+				print("Usage: rm [name]", "err");
+				return;
+			}
+			if (name === "S") {
+				print("Cannot remove built-in S.", "err");
+				return;
+			}
+			const before = state.rules.length;
+			state.rules = state.rules.filter((r) => {
+				const used = new Set();
+				collectFunctionNames(r.lhs, used);
+				collectFunctionNames(r.rhs, used);
+				return !used.has(name);
+			});
+			const removed = before - state.rules.length;
+			const wasExistential = name in state.existentials;
+			if (removed === 0 && !wasExistential && !state.knownFunctions.has(name)) {
+				print(`${name} not found.`);
+				return;
+			}
+			state.knownFunctions.delete(name);
+			delete state.existentials[name];
+			delete state.algebraic[name];
+			invalidateRewriteCache();
+			const parts = [];
+			if (removed > 0) parts.push(`${removed} rule${removed === 1 ? "" : "s"}`);
+			if (wasExistential) parts.push("existential declaration");
+			print(`${name} removed (${parts.join(", ") || "no rules"}).`);
+		}
+
+		function listFunctions(name) {
+			function existentialTag(n) {
+				const parts = [];
+				const arity = state.existentials[n];
+				if (arity === 0) parts.push("existential constant");
+				else if (arity !== undefined) parts.push(`existential arity ${arity}`);
+				const algebra = describeAlgebraic(state.algebraic[n]);
+				if (algebra) parts.push(algebra);
+				return parts.length > 0 ? `  [${parts.join("; ")}]` : "";
+			}
+
+			if (name) {
+				// Show rules involving this function
+				const rules = state.rules.filter((r) => {
+					const fns = new Set();
+					collectFunctionNames(r.lhs, fns);
+					collectFunctionNames(r.rhs, fns);
+					return fns.has(name);
+				});
+				if (!state.knownFunctions.has(name) && rules.length === 0) {
+					print(`${name}: not defined.`, "err");
+					return;
+				}
+				print(`${name}${existentialTag(name)}`);
+				if (rules.length === 0) {
+					print("  (no rules)");
+				} else {
+					for (const r of rules) print(`  ${r.source}${r.inferred ? "  [inferred]" : ""}${r.theorem ? "  [theorem]" : ""}`);
+				}
+				return;
+			}
+			// No argument: list all functions
+			const names = [...state.knownFunctions].sort();
+			if (names.length === 0) {
+				print("No functions.");
+				return;
+			}
+			for (const n of names) {
+				print(`${n}${existentialTag(n)}`);
+			}
+		}
+
+		async function bakeFunctionRange(argsRaw) {
+			const parts = argsRaw.trim().split(/\s+/);
+			if (parts.length < 3 || (parts.length - 1) % 2 !== 0) {
+				print("Usage: bake [func] [lo hi] [lo hi] ...", "err");
+				return;
+			}
+			const funcName = parts[0];
+			const ranges = [];
+			for (let i = 1; i < parts.length; i += 2) {
+				const lo = parseInt(parts[i], 10);
+				const hi = parseInt(parts[i + 1], 10);
+				if (isNaN(lo) || isNaN(hi) || lo > hi) {
+					print(`Invalid range: ${parts[i]} ${parts[i + 1]}`, "err");
+					return;
+				}
+				ranges.push([lo, hi]);
+			}
+
+			if (!state.baked[funcName]) state.baked[funcName] = {};
+			const cache = state.baked[funcName];
+
+			const allKeys = [];
+			function collectKeys(depth, current) {
+				if (depth === ranges.length) {
+					allKeys.push(current.slice());
+					return;
+				}
+				const [lo, hi] = ranges[depth];
+				for (let v = lo; v <= hi; v++) {
+					current.push(v);
+					collectKeys(depth + 1, current);
+					current.pop();
+				}
+			}
+			collectKeys(0, []);
+
+			const total = allKeys.length;
+			const rangeStr = ranges.map(([lo, hi]) => `${lo}-${hi}`).join(" x ");
+
+			const progressEl = document.createElement("div");
+			progressEl.className = "bake-progress";
+			progressEl.innerHTML =
+				`<div class="bake-head"><span class="bake-label">Baking ${funcName} over ${rangeStr}: <span class="bake-count">0</span>/${total}</span><button class="bake-cancel" type="button" title="Cancel bake">×</button></div>` +
+				`<div class="bake-bar-track"><div class="bake-bar-fill" style="width:0%"></div></div>`;
+			output.appendChild(progressEl);
+			output.scrollTop = output.scrollHeight;
+
+			const labelCount = progressEl.querySelector(".bake-count");
+			const labelText = progressEl.querySelector(".bake-label");
+			const barFill = progressEl.querySelector(".bake-bar-fill");
+			const cancelBtn = progressEl.querySelector(".bake-cancel");
+
+			let canceled = false;
+			cancelBtn.addEventListener("click", () => {
+				canceled = true;
+				cancelBtn.disabled = true;
+				cancelBtn.textContent = "…";
+			});
+
+			function isUnresolvedValue(value, callStr) {
+				if (typeof value !== "string") return false;
+				if (value === callStr) return true;
+				return value.includes(`${funcName}(`);
+			}
+
+			async function tryBakeKey(current) {
+				const key = current.join(",");
+				const callStr = `${funcName}(${current.join(",")})`;
+				const existing = cache[key];
+				if (existing !== undefined && !isUnresolvedValue(existing, callStr)) {
+					return { status: "already", key, callStr };
+				}
+
+				try {
+					const parsed = parseExpression(callStr);
+					const solved = await solveByStateWalk(parsed, 2500, {
+						progressEvery: 14
+					});
+					const normalized = normalizeSuccessorNumerals(solved.result);
+					const out = termToString(normalized);
+					if (!isUnresolvedValue(out, callStr)) {
+						cache[key] = out;
+						invalidateRewriteCache();
+						return { status: "resolved", key, callStr, value: out };
+					}
+				} catch {}
+
+				return { status: "pending", key, callStr };
+			}
+
+			try {
+				const YIELD_EVERY = 8;
+				let done = 0;
+				let skipped = 0;
+				let resolvedNow = 0;
+				let pending = [];
+
+				for (let idx = 0; idx < allKeys.length; idx++) {
+					if (canceled) break;
+					const current = allKeys[idx];
+					const verdict = await tryBakeKey(current);
+					if (verdict.status === "already") {
+						skipped++;
+					} else if (verdict.status === "resolved") {
+						resolvedNow++;
+					} else {
+						pending.push(current);
+					}
+
+					done++;
+					if (done % YIELD_EVERY === 0 || done === total) {
+						const pct = Math.round((done / total) * 100);
+						labelCount.textContent = done;
+						barFill.style.width = `${pct}%`;
+						output.scrollTop = output.scrollHeight;
+						await new Promise((r) => setTimeout(r, 0));
+					}
+				}
+
+				labelCount.textContent = total;
+				barFill.style.width = "100%";
+				let pass = 0;
+				while (!canceled && pending.length > 0) {
+					pass++;
+					let progressed = 0;
+					const nextPending = [];
+					for (let i = 0; i < pending.length; i++) {
+						if (canceled) break;
+						const current = pending[i];
+						const verdict = await tryBakeKey(current);
+						if (verdict.status === "resolved" || verdict.status === "already") {
+							progressed++;
+							if (verdict.status === "resolved") resolvedNow++;
+						} else {
+							nextPending.push(current);
+						}
+
+						if (i % YIELD_EVERY === 0 || i === pending.length - 1) {
+							labelText.textContent = `Baking ${funcName} over ${rangeStr}: ${total}/${total} (retry ${pass}, pending ${nextPending.length + (pending.length - i - 1)})`;
+							output.scrollTop = output.scrollHeight;
+							await new Promise((r) => setTimeout(r, 0));
+						}
+					}
+
+					pending = nextPending;
+					if (progressed === 0) break;
+				}
+
+				const unresolved = pending.length;
+				const totalCount = Object.keys(cache).length;
+				if (canceled) {
+					progressEl.innerHTML = `<span style="color:#ffb36b">Canceled. ${funcName} baked over ${rangeStr}: ${resolvedNow} new, ${totalCount} total, ${unresolved} unresolved.</span>`;
+				} else {
+					progressEl.innerHTML = `<span style="color:#7eb8ff">Done. ${funcName} baked over ${rangeStr}: ${resolvedNow} new, ${totalCount} total${unresolved > 0 ? `, ${unresolved} unresolved` : ""}.</span>`;
+				}
+			} finally {
+				output.scrollTop = output.scrollHeight;
+			}
+		}
+
+		function listBaked() {
+			const names = Object.keys(state.baked).sort();
+			if (names.length === 0) {
+				print("No baked functions.");
+				return;
+			}
+			for (const name of names) {
+				const count = Object.keys(state.baked[name]).length;
+				print(`${name}: ${count} entr${count === 1 ? "y" : "ies"}`);
+			}
+		}
+
+		function removeBake(name) {
+			if (!name) {
+				print("Usage: rm bake [name]", "err");
+				return;
+			}
+			if (state.baked[name]) {
+				const count = Object.keys(state.baked[name]).length;
+				delete state.baked[name];
+				invalidateRewriteCache();
+				print(`${name} bake removed (${count} entr${count === 1 ? "y" : "ies"}).`);
+			} else {
+				print(`No baked data for ${name}.`);
+			}
+		}
+
+		function exportState() {
+			const payload = {
+				version: 1,
+				rules: state.rules.map((r) => r.source),
+				baked: state.baked,
+				existentials: state.existentials,
+				algebraic: state.algebraic,
+				narrow: { ...state.narrow },
+				autobake: state.autobake,
+				ranker: { ...state.ml.ranker, weights: { ...state.ml.ranker.weights } }
+			};
+			const json = JSON.stringify(payload, null, 2);
+			const blob = new Blob([json], { type: "application/json" });
+			const url = URL.createObjectURL(blob);
+			const stamp = new Date().toISOString().replace(/[:.]/g, "-");
+			const link = document.createElement("a");
+			link.href = url;
+			link.download = `aximalpha-state-${stamp}.json`;
+			document.body.appendChild(link);
+			link.click();
+			link.remove();
+			setTimeout(() => URL.revokeObjectURL(url), 1500);
+			print(`Exported JSON file: ${link.download}`);
+		}
+
+		function applyImportedState(data) {
+			if (!data || !Array.isArray(data.rules)) {
+				print("JSON must contain { rules: [...] }.", "err");
+				return;
+			}
+
+			state.rules = [];
+			state.knownFunctions = new Set(["S"]);
+			state.baked = {};
+			state.existentials = {};
+			state.algebraic = {};
+			invalidateRewriteCache();
+
+			// Existentials must be known BEFORE rules are parsed: a zero-arity one
+			// changes how a bare identifier reads, so parsing first would bake the old
+			// variable interpretation into every rule.
+			if (data.existentials && typeof data.existentials === "object") {
+				for (const [name, arity] of Object.entries(data.existentials)) {
+					const a = Number(arity);
+					if (Number.isInteger(a) && a >= 0) {
+						state.existentials[name] = a;
+						state.knownFunctions.add(name);
+					}
+				}
+			}
+
+			for (const source of data.rules) {
+				try {
+					const parsed = parseEquation(source);
+					state.rules.push({ ...parsed, source });
+					collectFunctionNames(parsed.lhs, state.knownFunctions);
+					collectFunctionNames(parsed.rhs, state.knownFunctions);
+				} catch (e) {
+					print(`Skipped invalid rule: ${source}`, "err");
+				}
+			}
+			if (data.baked && typeof data.baked === "object") {
+				for (const [name, entries] of Object.entries(data.baked)) {
+					if (typeof entries === "object") {
+						state.baked[name] = { ...entries };
+					}
+				}
+				const bakedCount = Object.keys(state.baked).length;
+				if (bakedCount > 0) print(`Restored baked data for: ${Object.keys(state.baked).join(", ")}`);
+			}
+			if (data.existentials && typeof data.existentials === "object") {
+				for (const [name, arity] of Object.entries(data.existentials)) {
+					const a = Number(arity);
+					if (Number.isInteger(a) && a >= 0) {
+						state.existentials[name] = a;
+						state.knownFunctions.add(name);
+					}
+				}
+				const exCount = Object.keys(state.existentials).length;
+				if (exCount > 0) print(`Restored existentials: ${Object.keys(state.existentials).join(", ")}`);
+			}
+			if (data.algebraic && typeof data.algebraic === "object") {
+				for (const [name, props] of Object.entries(data.algebraic)) {
+					if (!props || typeof props !== "object") continue;
+					state.algebraic[name] = { assoc: Boolean(props.assoc), comm: Boolean(props.comm) };
+					state.knownFunctions.add(name);
+				}
+				const names = Object.keys(state.algebraic);
+				if (names.length > 0) print(`Restored algebraic laws for: ${names.join(", ")}`);
+			}
+			if (data.narrow && typeof data.narrow === "object") {
+				if (typeof data.narrow.enabled === "boolean") state.narrow.enabled = data.narrow.enabled;
+				const bound = Number(data.narrow.numeralBound);
+				if (Number.isInteger(bound) && bound >= 0) state.narrow.numeralBound = bound;
+				const cap = Number(data.narrow.maxInstantiations);
+				if (Number.isInteger(cap) && cap >= 1) state.narrow.maxInstantiations = cap;
+				const rounds = Number(data.narrow.zigzagRounds);
+				if (Number.isInteger(rounds) && rounds >= 1) state.narrow.zigzagRounds = rounds;
+				const width = Number(data.narrow.zagWidth);
+				if (Number.isInteger(width) && width >= 1) state.narrow.zagWidth = width;
+				print(`Restored narrow: ${state.narrow.enabled ? `on, numerals 0..${state.narrow.numeralBound}` : "off"}`);
+			}
+			if (data.ranker && typeof data.ranker === "object") {
+				const r = state.ml.ranker;
+				if (data.ranker.weights && typeof data.ranker.weights === "object") {
+					r.weights = { ...data.ranker.weights };
+				}
+				if (typeof data.ranker.learn === "boolean") r.learn = data.ranker.learn;
+				if (typeof data.ranker.rank === "boolean") r.rank = data.ranker.rank;
+				if (Number.isFinite(data.ranker.examples)) r.examples = data.ranker.examples;
+				if (Number.isFinite(data.ranker.solves)) r.solves = data.ranker.solves;
+				const n = Object.keys(r.weights).length;
+				if (n > 0) print(`Restored edge ranker: ${n} weights from ${r.solves} solve(s)`);
+			}
+			if (typeof data.autobake === "boolean") {
+				state.autobake = data.autobake;
+				print(`Restored autobake: ${state.autobake ? "on" : "off"}`);
+			}
+			print(`Imported ${state.rules.length} rule${state.rules.length === 1 ? "" : "s"}.`);
+		}
+
+		function importState() {
+			const picker = document.createElement("input");
+			picker.type = "file";
+			picker.accept = ".json,application/json";
+			picker.addEventListener("change", async () => {
+				const file = picker.files && picker.files[0];
+				if (!file) return;
+				let data;
+				try {
+					const raw = await file.text();
+					data = JSON.parse(raw);
+				} catch {
+					print("Invalid JSON file.", "err");
+					return;
+				}
+				applyImportedState(data);
+			});
+			picker.click();
+		}
+
+		async function solveWithProgress(parsed, maxVisited, options = {}) {
+			const label = options.label || `Solving ${termToString(parsed)}`;
+			const progress = createAsyncProgressBar(label, maxVisited, Boolean(options.cancellable));
+			const solved = await solveByStateWalk(parsed, maxVisited, {
+				collectDebug: Boolean(options.collectDebug),
+				maxDebugSteps: options.maxDebugSteps,
+				maxDebugNeighborSamples: options.maxDebugNeighborSamples,
+				targetFunctions: options.targetFunctions || null,
+				isCanceled: progress.isCanceled,
+				onProgress: (p) => {
+					progress.update(p.explored, p.maxVisited, `${label}: ${p.explored}/${p.maxVisited} (bestH=${p.bestH}, q=${p.queueSize})`);
+				},
+				progressEvery: 10
+			});
+			if (progress.isCanceled()) {
+				progress.finish(`Canceled: ${label}`, "#ffb36b");
+				return null;
+			}
+			progress.finish(`Done: ${label} (${solved.exploredOrder.length} explored)`, "#7eb8ff");
+			return solved;
+		}
+
+		async function evaluateExpression(source) {
+			const { expressionText, targetFunctions } = parseExpressionWithTarget(source);
+			const parsed = parseExpression(expressionText);
+			const solved = await solveWithProgress(parsed, 2500, {
+				label: `Eval ${termToString(parsed)}`,
+				cancellable: true,
+				targetFunctions
+			});
+			if (!solved) return;
+			const normalizedResult = normalizeSuccessorNumerals(solved.result);
+			print(termToString(normalizedResult));
+			const learned = maybeAutoBake(parsed, solved.result);
+			if (learned) print(`  autobaked ${learned}`);
+		}
+
+		function getFunctionArities(functionName) {
+			const arities = new Set();
+			for (const rule of state.rules) {
+				const collectArities = (term) => {
+					if (term.kind === "func" && term.name === functionName) {
+						arities.add(term.args.length);
+					}
+					if (term.kind === "func") {
+						for (const arg of term.args) collectArities(arg);
+					}
+				};
+				collectArities(rule.lhs);
+				collectArities(rule.rhs);
+			}
+			return arities.size > 0 ? [...arities].sort((a, b) => a - b) : [1, 2];
+		}
+
+		function buildTemplatesForFunction(functionName) {
+			const arities = getFunctionArities(functionName);
+			const templates = [];
+			for (const arity of arities) {
+				const varChars = "xyzwuvs".split("").slice(0, arity);
+				const templateStr = `${functionName}(${varChars.join(",")})`;
+				templates.push(templateStr);
+			}
+			return templates;
+		}
+
+		async function runEvaluateCommand(boundText, expressionText) {
+			const bound = Number(boundText);
+			if (!Number.isFinite(bound) || bound < 0 || !Number.isInteger(bound)) {
+				print("Usage: evaluate [bound>=0 integer] [expression]", "err");
+				return;
+			}
+			let templates = [];
+			if (/^[A-Za-z_][A-Za-z0-9_]*$/.test(expressionText.trim())) {
+				const funcName = expressionText.trim();
+				if (!state.knownFunctions.has(funcName)) {
+					print(`Function '${funcName}' not defined.`, "err");
+					return;
+				}
+				templates = buildTemplatesForFunction(funcName);
+			} else {
+				templates = [expressionText.trim()];
+			}
+
+			for (const template of templates) {
+				const result = await evaluateAndDiscover(bound, template, { debug: false });
+				if (!result) continue;
+				print(`Evaluate tested ${result.tested} case${result.tested === 1 ? "" : "s"} for ${result.template}.`);
+				if (result.found.length === 0) {
+					print("  No new axioms discovered.");
+					continue;
+				}
+				print(`  Discovered ${result.found.length} new axiom${result.found.length === 1 ? "" : "s"}:`);
+				for (const source of result.found) print(`    ${source}`);
+			}
+		}
+
+		async function debugEvaluateCommand(boundText, expressionText) {
+			const bound = Number(boundText);
+			if (!Number.isFinite(bound) || bound < 0 || !Number.isInteger(bound)) {
+				print("Usage: debug evaluate [bound>=0 integer] [expression]", "err");
+				return;
+			}
+			let templates = [];
+			if (/^[A-Za-z_][A-Za-z0-9_]*$/.test(expressionText.trim())) {
+				const funcName = expressionText.trim();
+				if (!state.knownFunctions.has(funcName)) {
+					print(`Function '${funcName}' not defined.`, "err");
+					return;
+				}
+				templates = buildTemplatesForFunction(funcName);
+			} else {
+				templates = [expressionText.trim()];
+			}
+
+			for (const template of templates) {
+				print(`Debug evaluate: bound=${bound}, template=${template}`);
+				const result = await evaluateAndDiscover(bound, template, { debug: true });
+				if (!result) continue;
+				print(`  Tested ${result.tested} case${result.tested === 1 ? "" : "s"}.`);
+				if (result.found.length === 0) {
+					print("  Axioms found: (none)");
+					continue;
+				}
+				print(`  Axioms found (${result.found.length}):`);
+				for (const source of result.found) print(`    ${source}`);
+			}
+		}
+
+		function listHeuristicConfig() {
+			print("Heuristic config:");
+			for (const [key, value] of Object.entries(heuristicConfig)) {
+				print(`  ${key} = ${value}`);
+			}
+		}
+
+		function setHeuristicConfig(raw) {
+			const m = raw.match(/^(\w+)\s+(.+)$/);
+			if (!m) {
+				print("Usage: heur set [key] [value]", "err");
+				return;
+			}
+			const key = m[1];
+			const valRaw = m[2].trim();
+			if (!(key in heuristicConfig)) {
+				print(`Unknown heuristic key: ${key}`, "err");
+				return;
+			}
+
+			const num = Number(valRaw);
+			if (!Number.isFinite(num)) {
+				print(`Invalid numeric value: ${valRaw}`, "err");
+				return;
+			}
+
+			const bounded01 = new Set(["explorationChance", "alternatePathChance"]);
+			if (bounded01.has(key) && (num < 0 || num > 1)) {
+				print(`${key} must be in [0,1].`, "err");
+				return;
+			}
+
+			const integerKeys = new Set(["explorationInterval", "explorationPoolSample", "explorationPoolLimit", "explorationPoolTrimTo"]);
+			heuristicConfig[key] = integerKeys.has(key) ? Math.max(0, Math.floor(num)) : num;
+			print(`heuristic ${key} = ${heuristicConfig[key]}`);
+		}
+
+		function parseExistsSpec(raw) {
+			const s = raw.trim();
+			// Simple name: "i", "pi", "eps"
+			const simple = s.match(/^([A-Za-z_][A-Za-z0-9_]*)$/);
+			if (simple) return { name: simple[1], arity: 0 };
+			// Name with argument list: "n(x)", "i(x,y)", "n()"
+			const withArgs = s.match(/^([A-Za-z_][A-Za-z0-9_]*)\(([^)]*)\)$/);
+			if (withArgs) {
+				const argStr = withArgs[2].trim();
+				const arity = argStr ? argStr.split(",").filter((a) => a.trim()).length : 0;
+				return { name: withArgs[1], arity };
+			}
+			return null;
+		}
+
+		// Remember a solved ground call as a baked fact. Only fires for F(nums...) with a
+		// fully ground answer — anything with variables left, or that still mentions F,
+		// isn't a settled result and would poison the table.
+		function maybeAutoBake(sourceTerm, resultTerm) {
+			if (!state.autobake) return null;
+			if (!sourceTerm || !resultTerm) return null;
+			// Store under the canonical form, since that is what lookups will present.
+			sourceTerm = canonicalizeTerm(sourceTerm);
+			if (sourceTerm.kind !== "func") return null;
+			// Any ground argument is bakeable, not just numerals — B(L(0,1))=2 is exactly
+			// the kind of fact these derivations are built out of.
+			if (collectVariableNames(sourceTerm).size > 0) return null;
+
+			const normalized = canonicalizeTerm(normalizeSuccessorNumerals(resultTerm));
+			if (collectVariableNames(normalized).size > 0) return null;
+			if (isEqual(sourceTerm, normalized)) return null;
+
+			const text = termToString(normalized);
+			if (text.includes(`${sourceTerm.name}(`)) return null;
+
+			const key = bakedKeyForArgs(sourceTerm.args);
+			if (!state.baked[sourceTerm.name]) state.baked[sourceTerm.name] = {};
+			if (state.baked[sourceTerm.name][key] === text) return null;
+
+			state.baked[sourceTerm.name][key] = text;
+			invalidateRewriteCache();
+			return `${termToString(sourceTerm)}=${text}`;
+		}
+
+		function reparseRulesFromSource() {
+			const rebuilt = [];
+			for (const rule of state.rules) {
+				try {
+					const parsed = parseEquation(rule.source);
+					rebuilt.push({ ...rule, lhs: parsed.lhs, rhs: parsed.rhs });
+				} catch {
+					rebuilt.push(rule);
+				}
+			}
+			state.rules = rebuilt;
+		}
+
+		function describeAlgebraic(props) {
+			if (!props) return "";
+			if (props.assoc && props.comm) return "associative, commutative";
+			if (props.assoc) return "associative";
+			if (props.comm) return "commutative";
+			return "";
+		}
+
+		// `assoc F` / `comm F` / `ac F` — declare laws so the engine can canonicalise.
+		// `assoc F off` (or rm F) clears them.
+		function algebraicCommand(kind, raw) {
+			const parts = raw.trim().split(/\s+/).filter(Boolean);
+
+			if (parts.length === 0) {
+				const names = Object.keys(state.algebraic).sort();
+				if (names.length === 0) {
+					print("No associative or commutative declarations.");
+					return;
+				}
+				for (const name of names) {
+					print(`  ${name}: ${describeAlgebraic(state.algebraic[name])}`);
+				}
+				return;
+			}
+
+			const name = parts[0];
+			if (name === "S") {
+				print("Cannot declare laws for built-in S.", "err");
+				return;
+			}
+
+			if (parts[1] === "off") {
+				if (!state.algebraic[name]) {
+					print(`${name} has no algebraic declaration.`);
+					return;
+				}
+				delete state.algebraic[name];
+				invalidateRewriteCache();
+				print(`${name}: algebraic laws cleared.`);
+				return;
+			}
+
+			const props = state.algebraic[name] || { assoc: false, comm: false };
+			if (kind === "assoc" || kind === "ac") props.assoc = true;
+			if (kind === "comm" || kind === "ac") props.comm = true;
+			state.algebraic[name] = props;
+			state.knownFunctions.add(name);
+			invalidateRewriteCache();
+			print(`${name}: ${describeAlgebraic(props)}.`);
+
+			const redundant = state.rules.filter((r) => ruleIsAlgebraicTautology(r));
+			if (redundant.length > 0) {
+				print(`  ${redundant.length} rule${redundant.length === 1 ? "" : "s"} now redundant and skipped during search:`);
+				for (const rule of redundant) print(`    ${rule.source}`);
+			}
+		}
+
+		function autobakeCommand(raw) {
+			const arg = raw.trim().toLowerCase();
+			if (!arg) {
+				const total = Object.values(state.baked).reduce((n, t) => n + Object.keys(t).length, 0);
+				print(`autobake: ${state.autobake ? "on" : "off"} (${total} baked entr${total === 1 ? "y" : "ies"} stored)`);
+				return;
+			}
+			if (arg !== "on" && arg !== "off") {
+				print("Usage: autobake | autobake on | autobake off", "err");
+				return;
+			}
+			state.autobake = arg === "on";
+			print(state.autobake
+				? "autobake on — solved ground expressions are baked automatically."
+				: "autobake off.");
+		}
+
+		function graphCapCommand(raw) {
+			const arg = raw.trim();
+			if (!arg) {
+				print(`graph cap = ${debugGraph.maxLiveNodes} nodes`);
+				return;
+			}
+			const n = Number(arg);
+			if (!Number.isInteger(n) || n < 10) {
+				print("Usage: graph cap [n>=10]", "err");
+				return;
+			}
+			debugGraph.maxLiveNodes = n;
+			print(`graph cap = ${n} nodes. Only the view is capped, never the walk itself;`);
+			print("  the force layout is O(n²) per frame, so large caps render slowly.");
+		}
+
+		function narrowCommand(raw) {
+			const arg = raw.trim().toLowerCase();
+
+			if (!arg) {
+				if (!state.narrow.enabled) {
+					print("narrow: off (reverse rules never expand or guess values)");
+					return;
+				}
+				print(`narrow: on, numerals 0..${state.narrow.numeralBound} (plus subterms of the term being rewritten)`);
+				print(`  max guesses per rule per position: ${state.narrow.maxInstantiations}`);
+				print(`  zig-zag: ${state.narrow.zigzagRounds} rounds, expanding from ${state.narrow.zagWidth} stalled state(s) per zag`);
+				return;
+			}
+
+			const roundsMatch = arg.match(/^rounds\s+(\d+)$/);
+			if (roundsMatch) {
+				state.narrow.zigzagRounds = Math.max(1, parseInt(roundsMatch[1], 10));
+				print(`narrow rounds = ${state.narrow.zigzagRounds} zig-zag alternations.`);
+				return;
+			}
+
+			const widthMatch = arg.match(/^width\s+(\d+)$/);
+			if (widthMatch) {
+				state.narrow.zagWidth = Math.max(1, parseInt(widthMatch[1], 10));
+				print(`narrow width = ${state.narrow.zagWidth} stalled state(s) expanded per zag.`);
+				return;
+			}
+
+			if (arg === "off") {
+				state.narrow.enabled = false;
+				invalidateRewriteCache();
+				print("narrow off — reverse rules are limited to non-expanding, fully-bound rewrites.");
+				return;
+			}
+
+			if (arg === "on") {
+				state.narrow.enabled = true;
+				invalidateRewriteCache();
+				print(`narrow on — numerals 0..${state.narrow.numeralBound} plus subterms.`);
+				return;
+			}
+
+			const maxMatch = arg.match(/^max\s+(\d+)$/);
+			if (maxMatch) {
+				state.narrow.maxInstantiations = Math.max(1, parseInt(maxMatch[1], 10));
+				invalidateRewriteCache();
+				print(`narrow max = ${state.narrow.maxInstantiations} guesses per rule per position.`);
+				return;
+			}
+
+			const bound = Number(arg);
+			if (!Number.isInteger(bound) || bound < 0) {
+				print("Usage: narrow | narrow on | narrow off | narrow [bound>=0] | narrow max [n] | narrow rounds [n] | narrow width [n]", "err");
+				return;
+			}
+
+			state.narrow.numeralBound = bound;
+			state.narrow.enabled = true;
+			invalidateRewriteCache();
+			print(`narrow on — numerals 0..${bound} plus subterms of the term being rewritten.`);
+		}
+
+		function existsCommand(raw) {
+			const spec = parseExistsSpec(raw.trim());
+			if (!spec) {
+				print("Usage: exists name  or  exists name(x,y,...)", "err");
+				return;
+			}
+			const { name, arity } = spec;
+			if (name === "S") {
+				print("Cannot redefine built-in S.", "err");
+				return;
+			}
+			const already = state.existentials[name];
+			state.existentials[name] = arity;
+			state.knownFunctions.add(name);
+			// Rules typed before the declaration parsed this name as a variable; re-read
+			// them from source so it becomes the constant everywhere.
+			if (arity === 0) reparseRulesFromSource();
+			invalidateRewriteCache();
+			if (already !== undefined && already !== arity) {
+				print(`${name} redeclared as existential (arity ${arity}).`);
+			} else if (arity === 0) {
+				print(`${name} declared as existential constant.`);
+			} else {
+				print(`${name} declared as existential with arity ${arity}.`);
+			}
+		}
+
+		function parseBoundsSpec(parts, startIdx = 1) {
+			if (parts.length < startIdx + 2 || (parts.length - startIdx) % 2 !== 0) {
+				return null;
+			}
+			const ranges = [];
+			for (let i = startIdx; i < parts.length; i += 2) {
+				const lo = parseInt(parts[i], 10);
+				const hi = parseInt(parts[i + 1], 10);
+				if (!Number.isFinite(lo) || !Number.isFinite(hi) || lo > hi) return null;
+				ranges.push([lo, hi]);
+			}
+			return ranges;
+		}
+
+		function expandRanges(ranges) {
+			const out = [];
+			function walk(depth, acc) {
+				if (depth === ranges.length) {
+					out.push(acc.slice());
+					return;
+				}
+				const [lo, hi] = ranges[depth];
+				for (let v = lo; v <= hi; v++) {
+					acc.push(v);
+					walk(depth + 1, acc);
+					acc.pop();
+				}
+			}
+			walk(0, []);
+			return out;
+		}
+
+		function clamp(val, lo, hi) {
+			return Math.max(lo, Math.min(hi, val));
+		}
+
+		function mutateHeuristicConfig(base, scale = 1) {
+			const next = { ...base };
+			next.functionWeight = clamp(base.functionWeight + (Math.random() * 4 - 2) * scale, 1, 30);
+			next.depthWeight = clamp(base.depthWeight + (Math.random() * 1.5 - 0.75) * scale, 0, 10);
+			next.symbolWeight = clamp(base.symbolWeight + (Math.random() * 1.5 - 0.75) * scale, 0, 10);
+			next.tolerance = clamp(base.tolerance + (Math.random() * 3 - 1.5) * scale, 0, 30);
+			next.explorationInterval = Math.max(0, Math.floor(clamp(base.explorationInterval + (Math.random() * 10 - 5) * scale, 0, 200)));
+			next.explorationChance = clamp(base.explorationChance + (Math.random() * 0.18 - 0.09) * scale, 0, 1);
+			next.alternatePathChance = clamp(base.alternatePathChance + (Math.random() * 0.18 - 0.09) * scale, 0, 1);
+			next.alternatePathToleranceMultiplier = clamp(base.alternatePathToleranceMultiplier + (Math.random() * 1.2 - 0.6) * scale, 1, 10);
+			next.successorDetourMultiplier = clamp(base.successorDetourMultiplier + (Math.random() * 2 - 1) * scale, 1, 20);
+			next.explorationPoolSample = Math.max(1, Math.floor(clamp(base.explorationPoolSample + (Math.random() * 4 - 2) * scale, 1, 50)));
+			next.explorationPoolLimit = Math.max(20, Math.floor(clamp(base.explorationPoolLimit + (Math.random() * 60 - 30) * scale, 20, 1000)));
+			next.explorationPoolTrimTo = Math.max(10, Math.floor(clamp(base.explorationPoolTrimTo + (Math.random() * 40 - 20) * scale, 10, next.explorationPoolLimit - 1)));
+			return next;
+		}
+
+		function scoreSolveOutcome(solved) {
+			if (!solved || !solved.result) return 1e9;
+			const h = termHeuristic(solved.result, heuristicConfig);
+			const pathPenalty = solved.path ? solved.path.length * 0.7 : 0;
+			const exploredPenalty = solved.exploredOrder ? solved.exploredOrder.length * 0.04 : 0;
+			return h + pathPenalty + exploredPenalty;
+		}
+
+		async function mlTrainFunction(argsRaw) {
+			const parts = argsRaw.trim().split(/\s+/).filter(Boolean);
+			if (parts.length < 3) {
+				print("Usage: ml train [function] [lo hi] [lo hi] ...", "err");
+				return;
+			}
+			const functionName = parts[0];
+			const ranges = parseBoundsSpec(parts, 1);
+			if (!ranges) {
+				print("Usage: ml train [function] [lo hi] [lo hi] ...", "err");
+				return;
+			}
+
+			const combos = expandRanges(ranges);
+			if (combos.length === 0) {
+				print("No training samples generated.", "err");
+				return;
+			}
+
+			const MAX_TRAIN_SAMPLES = 48;
+			const trainSet = combos.slice(0, MAX_TRAIN_SAMPLES);
+			const populationSize = 8;
+			const generations = 6;
+			const solveBudget = 700;
+
+			const progress = createAsyncProgressBar(`ML training ${functionName}`, populationSize * generations * trainSet.length, true);
+			let bestConfig = { ...heuristicConfig };
+				let bestScore = Number.POSITIVE_INFINITY;
+				let done = 0;
+
+				for (let gen = 0; gen < generations; gen += 1) {
+					if (progress.isCanceled()) break;
+					const population = [];
+					population.push({ config: { ...bestConfig }, score: Number.POSITIVE_INFINITY });
+					for (let i = 1; i < populationSize; i += 1) {
+						population.push({ config: mutateHeuristicConfig(bestConfig, 1 + gen * 0.2), score: Number.POSITIVE_INFINITY });
+					}
+
+					for (const candidate of population) {
+						if (progress.isCanceled()) break;
+						let totalScore = 0;
+						for (let i = 0; i < trainSet.length; i += 1) {
+							if (progress.isCanceled()) break;
+							const args = trainSet[i];
+							const expr = parseExpression(`${functionName}(${args.join(",")})`);
+							const solved = await solveByStateWalk(expr, solveBudget, {
+								configOverride: candidate.config,
+								progressEvery: 18,
+								isCanceled: progress.isCanceled
+							});
+							totalScore += scoreSolveOutcome(solved);
+							done++;
+							if (done % 2 === 0 || done === populationSize * generations * trainSet.length) {
+								progress.update(done, populationSize * generations * trainSet.length, `ML training ${functionName}: gen ${gen + 1}/${generations}`);
+								await sleepFrame();
+							}
+						}
+						candidate.score = totalScore / trainSet.length;
+					}
+
+					population.sort((a, b) => a.score - b.score);
+					if (population[0].score < bestScore) {
+						bestScore = population[0].score;
+						bestConfig = { ...population[0].config };
+					}
+				}
+
+				if (progress.isCanceled()) {
+					progress.finish(`ML training canceled for ${functionName}.`, "#ffb36b");
+					return;
+				}
+
+				state.ml.models[functionName] = {
+					config: { ...bestConfig },
+					bounds: ranges,
+					score: bestScore,
+					trainedAt: new Date().toISOString()
+				};
+				progress.finish(`ML trained ${functionName}. score=${bestScore.toFixed(4)} (samples=${trainSet.length})`, "#7eb8ff");
+				print(`ML model ready for ${functionName}. Use 'ml on' to enable.`);
+		}
+
+		async function debugExpression(source) {
+			const { expressionText, targetFunctions } = parseExpressionWithTarget(source);
+			const parsed = parseExpression(expressionText);
+			const cfg = getEffectiveHeuristicConfig(parsed, null, targetFunctions);
+			const solved = await solveWithProgress(parsed, 2500, {
+				label: `Debug ${termToString(parsed)}`,
+				cancellable: true,
+				collectDebug: true,
+				maxDebugSteps: 40,
+				maxDebugNeighborSamples: 16,
+				targetFunctions
+			});
+			if (!solved) return;
+			const normalizedResult = normalizeSuccessorNumerals(solved.result);
+			const topCount = getTopHighlightCount();
+			const termsByKey = new Map();
+			for (const key of solved.exploredOrder) {
+				try {
+					termsByKey.set(key, parseExpression(key));
+				} catch {}
+			}
+			const topKeys = computeTopSimplifiedKeys(solved.exploredOrder, termsByKey, topCount, cfg);
+			showDebugGraph(solved, topKeys, termsByKey, cfg);
+			print(`States explored: ${solved.exploredOrder.length}`);
+			if (solved.phases && solved.phases.length > 1) {
+				const breakdown = solved.phases.map((p) => `${p.label} ${p.explored} (bestH=${p.bestH})`).join(", ");
+				print(`  phases: ${breakdown}`);
+			}
+			if (solved.path.length === 0) {
+				print("Path: (no rewrites)");
+			} else {
+				print("Path to result:");
+				for (const step of solved.path) {
+					print(`  ${step.from} -> ${step.to}  via ${step.reason}`);
+				}
+			}
+			print(`Result: ${termToString(solved.result)}`);
+			if (!isEqual(normalizedResult, solved.result)) {
+				print(`Normalized: ${termToString(normalizedResult)}`);
+			}
+			const learnedFromDebug = maybeAutoBake(parsed, solved.result);
+			if (learnedFromDebug) print(`Autobaked ${learnedFromDebug}`);
+
+			if (solved.debug) {
+				print("Heuristic debug:");
+				print(`  start h=${solved.debug.startH}, best h=${solved.debug.bestH}, enqueued=${solved.debug.enqueued}`);
+				print(`  skips: visited=${solved.debug.visitedSkips}, worse-g=${solved.debug.worseGSkips}, gated=${solved.debug.gateSkips}`);
+				const depList = solved.debug.successorDependentFunctions.length > 0
+					? solved.debug.successorDependentFunctions.join(", ")
+					: "(none)";
+				print(`  successor-dependent functions: ${depList}`);
+				print(`  target: ${solved.debug.targetFunctions.length > 0 ? solved.debug.targetFunctions.join(", ") : "(none — minimizing toward a numeral/existential)"}`);
+				for (let i = 0; i < solved.debug.steps.length; i += 1) {
+					const step = solved.debug.steps[i];
+					print(`  step ${i}: ${step.state}`);
+					print(`    g=${step.g}, h=${step.h}, bestH ${step.bestHBefore} -> ${step.bestHAfter}, neighbors=${step.neighborsGenerated}`);
+					print(`    enq=${step.enqueued}, reject visited=${step.rejectedVisited}, worse-g=${step.rejectedWorseG}, gated=${step.rejectedGate}`);
+					for (const sample of step.samples) {
+						print(`    ${sample}`);
+					}
+				}
+			}
+		}
+
+		async function debugInput(source) {
+			const evalMatch = source.match(/^evaluate\s+(\d+)\s+(.+)$/i);
+			if (evalMatch) {
+				await debugEvaluateCommand(evalMatch[1], evalMatch[2]);
+				return;
+			}
+			await debugExpression(source);
+		}
+
+		async function handleCommand(raw) {
+			const line = raw.trim();
+			if (!line) return;
+
+			print(`> ${line}`, "cmd");
+			const lower = line.toLowerCase();
+
+			if (lower === "clear") {
+				output.innerHTML = "";
+				return;
+			}
+			if (lower === "debug off") {
+				hideDebugGraph();
+				print("Debug graph hidden.");
+				return;
+			}
+			if (lower === "stop") {
+				if (!walkRuntime.active) {
+					print("No active walk to stop.");
+					return;
+				}
+				walkRuntime.stopRequested = true;
+				if (typeof walkRuntime.pendingDecisionResolve === "function") {
+					walkRuntime.pendingDecisionResolve("halt");
+				}
+				print("Stop requested for active walk.");
+				return;
+			}
+			if (lower === "ls bake") {
+				listBaked();
+				return;
+			}
+			if (lower === "ls" || lower.startsWith("ls ")) {
+				const arg = line.slice(2).trim();
+				listFunctions(arg || undefined);
+				return;
+			}
+			if (lower.startsWith("rm bake ")) {
+				removeBake(line.slice(8).trim());
+				return;
+			}
+			if (lower.startsWith("rm ")) {
+				removeFunction(line.slice(3).trim());
+				return;
+			}
+			if (lower.startsWith("bake ")) {
+				bakeFunctionRange(line.slice(5).trim()).catch((e) => {
+					print(e.message || "Bake error", "err");
+				});
+				return;
+			}
+			if (lower === "export") {
+				exportState();
+				return;
+			}
+			if (lower === "import") {
+				importState();
+				return;
+			}
+			if (lower.startsWith("debug ")) {
+				try {
+					await debugInput(line.slice(6).trim());
+				} catch (e) {
+					print(e.message || "Error", "err");
+				}
+				return;
+			}
+			if (lower === "heur" || lower === "heur ls" || lower === "heuristics" || lower === "heuristics ls") {
+				listHeuristicConfig();
+				return;
+			}
+			if (lower.startsWith("heur set ") || lower.startsWith("heuristics set ")) {
+				const payload = line.replace(/^heur(?:istics)?\s+set\s+/i, "");
+				setHeuristicConfig(payload);
+				return;
+			}
+			if (lower === "ac" || lower.startsWith("ac ")) {
+				algebraicCommand("ac", line.slice(2));
+				return;
+			}
+			if (lower === "assoc" || lower.startsWith("assoc ")) {
+				algebraicCommand("assoc", line.slice(5));
+				return;
+			}
+			if (lower === "comm" || lower.startsWith("comm ")) {
+				algebraicCommand("comm", line.slice(4));
+				return;
+			}
+			if (lower === "autobake" || lower.startsWith("autobake ")) {
+				autobakeCommand(line.slice("autobake".length));
+				return;
+			}
+			if (lower === "graph cap" || lower.startsWith("graph cap ")) {
+				graphCapCommand(line.slice("graph cap".length));
+				return;
+			}
+			if (lower === "narrow" || lower.startsWith("narrow ")) {
+				narrowCommand(line.slice("narrow".length));
+				return;
+			}
+			if (lower.startsWith("exists ") || lower === "exists") {
+				existsCommand(line.slice(6).trim());
+				return;
+			}
+			if (lower === "ml on") {
+				state.ml.enabled = true;
+				print("Machine learning mode enabled.");
+				return;
+			}
+			if (lower === "ml off") {
+				state.ml.enabled = false;
+				print("Machine learning mode disabled (heuristics only).");
+				return;
+			}
+			if (lower === "ml learn on" || lower === "ml learn off") {
+				state.ml.ranker.learn = lower.endsWith("on");
+				print(state.ml.ranker.learn
+					? "ml learn on — every successful solve trains the edge ranker."
+					: "ml learn off.");
+				return;
+			}
+			if (lower === "ml rank on" || lower === "ml rank off") {
+				state.ml.ranker.rank = lower.endsWith("on");
+				print(state.ml.ranker.rank
+					? "ml rank on — the learned ranker steers the search order."
+					: "ml rank off.");
+				return;
+			}
+			if (lower === "ml reset") {
+				state.ml.ranker.weights = {};
+				state.ml.ranker.examples = 0;
+				state.ml.ranker.solves = 0;
+				print("Edge ranker cleared.");
+				return;
+			}
+			if (lower === "ml stats") {
+				const r = state.ml.ranker;
+				const entries = Object.entries(r.weights).sort((a, b) => Math.abs(b[1]) - Math.abs(a[1]));
+				print(`Edge ranker: learn=${r.learn ? "on" : "off"}, rank=${r.rank ? "on" : "off"}`);
+				print(`  trained on ${r.examples} edge${r.examples === 1 ? "" : "s"} from ${r.solves} solve${r.solves === 1 ? "" : "s"}`);
+				if (entries.length === 0) {
+					print("  (no weights learned yet)");
+					return;
+				}
+				print("  strongest signals:");
+				for (const [key, value] of entries.slice(0, 12)) {
+					print(`    ${value >= 0 ? "+" : ""}${value.toFixed(3)}  ${key}`);
+				}
+				return;
+			}
+			if (lower === "ml" || lower === "ml help") {
+				print("ML commands: ml on, ml off, ml train [function] [lo hi]...");
+				print("  ml learn on|off  — train the edge ranker on each successful solve");
+				print("  ml rank on|off   — let the learned ranker steer search order");
+				print("  ml stats | ml reset");
+				return;
+			}
+			if (lower.startsWith("ml train ")) {
+				await mlTrainFunction(line.slice(9).trim());
+				return;
+			}
+			if (lower === "evaluate") {
+				print("Usage: evaluate [bound] [expression]", "err");
+				return;
+			}
+			if (lower.startsWith("evaluate ")) {
+				const match = line.match(/^evaluate\s+(\d+)\s+(.+)$/i);
+				if (!match) {
+					print("Usage: evaluate [bound] [expression]", "err");
+					return;
+				}
+				try {
+					await runEvaluateCommand(match[1], match[2]);
+				} catch (e) {
+					print(e.message || "Error", "err");
+				}
+				return;
+			}
+			if (lower === "path" || lower === "paths") {
+				print("Usage: paths [maxVisited] [expression]", "err");
+				return;
+			}
+			if (lower.startsWith("paths ") || lower.startsWith("path ")) {
+				const match = line.match(/^paths?\s+(\d+)\s+(.+)$/i);
+				if (!match) {
+					print("Usage: paths [maxVisited] [expression]", "err");
+					return;
+				}
+				try {
+					await runPathsCommand(match[1], match[2]);
+				} catch (e) {
+					print(e.message || "Error", "err");
+				}
+				return;
+			}
+			if (lower === "walk" || lower === "walks") {
+				print("Usage: walk [delayMs] [expression]", "err");
+				return;
+			}
+			if (lower.startsWith("walk ") || lower.startsWith("walks ")) {
+				const match = line.match(/^walks?\s+(\d+)\s+(.+)$/i);
+				if (!match) {
+					print("Usage: walk [delayMs] [expression]", "err");
+					return;
+				}
+				try {
+					await runWalkCommand(match[1], match[2]);
+				} catch (e) {
+					print(e.message || "Error", "err");
+				}
+				return;
+			}
+
+			try {
+				if (line.includes("=")) {
+					addRule(line);
+				} else {
+					await evaluateExpression(line);
+				}
+			} catch (e) {
+				print(e.message || "Error", "err");
+			}
+		}
+
+		const commandHistory = [];
+		let historyIndex = -1;
+		let historyDraft = "";
+
+		input.addEventListener("keydown", (e) => {
+			if (e.key === "ArrowUp") {
+				if (commandHistory.length === 0) return;
+				e.preventDefault();
+				if (historyIndex === -1) {
+					historyDraft = input.value;
+					historyIndex = commandHistory.length - 1;
+				} else if (historyIndex > 0) {
+					historyIndex--;
+				}
+				input.value = commandHistory[historyIndex];
+				input.setSelectionRange(input.value.length, input.value.length);
+			} else if (e.key === "ArrowDown") {
+				if (historyIndex === -1) return;
+				e.preventDefault();
+				if (historyIndex < commandHistory.length - 1) {
+					historyIndex++;
+					input.value = commandHistory[historyIndex];
+				} else {
+					historyIndex = -1;
+					input.value = historyDraft;
+				}
+				input.setSelectionRange(input.value.length, input.value.length);
+			} else if (e.key === "Enter") {
+				const value = input.value;
+				input.value = "";
+				historyIndex = -1;
+				historyDraft = "";
+				if (value.trim()) commandHistory.push(value);
+				handleCommand(value).catch((err) => {
+					print(err?.message || "Error", "err");
+				});
+			}
+		});
+
+		setupGraphSettingsUI();
+		welcome();
+	</script>
+</body>
+</html>
